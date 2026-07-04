@@ -32,6 +32,10 @@ def parse_args(argv=None):
     parser.add_argument("-step-by-step", dest="step_by_step",
                         action="store_true",
                         help="avance action par action")
+    parser.add_argument("-dashboard", action="store_true",
+                        help="vue parallele : une grille de parties a la fois")
+    parser.add_argument("-grid", type=int, default=6,
+                        help="cote de la grille du dashboard (grid x grid)")
     return parser.parse_args(argv)
 
 
@@ -42,6 +46,10 @@ def run_session(env, interp, agent, learn, verbose, step_by_step,
     state = interp.get_state(env)
     max_length = len(env.snake)
     duration = 0
+    # Anti-blocage : borne le nombre de pas sans manger pour eviter qu'un
+    # modele en exploitation pure ne tourne en rond indefiniment.
+    stall = 0
+    stall_limit = env.size * env.size * constants.STALL_STEPS_FACTOR
 
     while not env.is_game_over():
         if verbose:
@@ -62,7 +70,8 @@ def run_session(env, interp, agent, learn, verbose, step_by_step,
 
         event = env.step(action)
         reward = interp.get_reward(event)
-        done = env.is_game_over()
+        stall = 0 if event["type"] == "green" else stall + 1
+        done = env.is_game_over() or stall >= stall_limit
         next_state = None if done else interp.get_state(env)
         if learn:
             agent.update(state, action, reward, next_state)
@@ -71,6 +80,8 @@ def run_session(env, interp, agent, learn, verbose, step_by_step,
 
         duration += 1
         max_length = max(max_length, len(env.snake))
+        if done:
+            break
 
     return max_length, duration
 
@@ -100,10 +111,15 @@ def main():
     if args.dontlearn:
         agent.epsilon = 0.0
 
+    interp = Interpreter()
+
+    if args.dashboard:
+        _run_dashboard(agent, interp, learn, args)
+        return
+
     display = _make_display(args.visual == "on")
 
     env = Environment()
-    interp = Interpreter()
     best_length = 0
     best_duration = 0
     for session in range(1, args.sessions + 1):
@@ -126,6 +142,27 @@ def main():
     print("Game over, max length = {}, max duration = {}"
           .format(best_length, best_duration))
 
+    if args.save:
+        if agent.save(args.save):
+            print("Modele sauvegarde dans {}".format(args.save))
+        else:
+            print("Avertissement : echec de la sauvegarde dans {}"
+                  .format(args.save), file=sys.stderr)
+
+
+def _run_dashboard(agent, interp, learn, args):
+    """Lance la vue parallele puis sauvegarde le modele si demande."""
+    try:
+        from dashboard import Dashboard
+        board = Dashboard(agent, interp, cols=args.grid, rows=args.grid,
+                          learn=learn, save_path=args.save)
+        board.run()
+    except Exception as error:      # pragma: no cover - depend de l'env
+        print("Avertissement : dashboard indisponible ({})".format(error),
+              file=sys.stderr)
+        return
+    print("Game over, max length = {}, max duration = {}"
+          .format(board.best_length, board.best_duration))
     if args.save:
         if agent.save(args.save):
             print("Modele sauvegarde dans {}".format(args.save))

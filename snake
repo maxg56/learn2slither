@@ -1,4 +1,4 @@
 #!/bin/sh
 # Point d'entree executable du projet Learn2Slither.
-# Delegue a main.py en passant tous les arguments.
-exec python3 "$(dirname "$0")/main.py" "$@"
+# Delegue a main.py via uv en passant tous les arguments.
+exec uv run --quiet python "$(dirname "$0")/main.py" "$@"

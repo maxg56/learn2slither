@@ -48,3 +48,11 @@ REWARD_GREEN = 20
 REWARD_RED = -20
 REWARD_NOTHING = -1
 REWARD_GAMEOVER = -100
+
+# --- Anti-blocage ----------------------------------------------------------
+# En exploitation pure (epsilon=0, modele charge), le serpent suit une
+# politique deterministe et peut tourner en rond indefiniment sans jamais
+# mourir : la partie ne se termine plus et la generation reste figee. On
+# force la fin de partie apres trop de pas consecutifs sans manger de pomme
+# verte. Le seuil est proportionnel a l'aire du board (bonus taille variable).
+STALL_STEPS_FACTOR = 4
