@@ -43,23 +43,67 @@ class Interpreter:
         return {action: self._ray(env, action)
                 for action in constants.ACTIONS}
 
+    @staticmethod
+    def _first_distance(ray, char):
+        """Distance en cases jusqu'a la 1re occurrence de char sur un rayon.
+
+        None si char est absent du rayon. La case adjacente a la tete est a
+        distance 1 (le rayon exclut la tete).
+        """
+        for i, cell in enumerate(ray):
+            if cell == char:
+                return i + 1
+        return None
+
     def get_state(self, env):
         """Reduit la vision en une cle hashable pour la Q-table.
 
-        Par direction : danger adjacent (mur ou corps), pomme verte
-        visible, pomme rouge visible. Etat = tuple de 12 bits, independant
-        de la taille du board.
+        Par direction : danger adjacent (mur ou corps), pomme verte visible,
+        pomme rouge visible. Etat = tuple de 12 bits, independant de la taille
+        du board. Le gradient vers la nourriture est fourni par le reward
+        shaping (approach_bonus), pas par l'etat : coder la distance ici
+        multiplie l'espace d'etats sans gain de perf mesurable.
         """
         features = []
         for action in constants.ACTIONS:
             ray = self._ray(env, action)
-            adjacent = ray[0]
-            danger = int(adjacent in (constants.CELL_WALL,
-                                      constants.CELL_BODY))
+            danger = int(ray[0] in (constants.CELL_WALL,
+                                    constants.CELL_BODY))
             green = int(constants.CELL_GREEN in ray)
             red = int(constants.CELL_RED in ray)
             features.extend((danger, green, red))
         return tuple(features)
+
+    def green_distance(self, env):
+        """Distance en cases jusqu'a la pomme verte visible la plus proche.
+
+        Balaie les 4 rayons depuis la tete ; retourne le plus petit nombre de
+        cases separant la tete d'une pomme verte alignee, ou None si aucune
+        pomme verte n'est visible. Purement derive de la vision.
+        """
+        if not env.snake:
+            return None
+        best = None
+        for action in constants.ACTIONS:
+            ray = self._ray(env, action)
+            distance = self._first_distance(ray, constants.CELL_GREEN)
+            if distance is not None and (best is None or distance < best):
+                best = distance
+        return best
+
+    def approach_bonus(self, dist_before, dist_after, event_type):
+        """Bonus de reward pour le rapprochement d'une pomme verte visible.
+
+        Applique seulement sur un deplacement simple (event "nothing") ou une
+        pomme verte reste visible avant et apres : positif si le serpent s'est
+        rapproche, negatif s'il s'est eloigne, nul a distance constante.
+        Les pas ou l'on mange/meurt sont deja geres par les rewards de base.
+        """
+        if event_type != "nothing":
+            return 0.0
+        if dist_before is None or dist_after is None:
+            return 0.0
+        return constants.REWARD_APPROACH * (dist_before - dist_after)
 
     def get_reward(self, event):
         """Calcule la recompense associee a une transition de l'env."""
@@ -67,6 +111,10 @@ class Interpreter:
         if kind == "green":
             return constants.REWARD_GREEN
         if kind == "red":
+            # Une pomme rouge qui reduit le serpent a zero est une mort :
+            # elle est penalisee comme un game over, pas comme un simple malus.
+            if event.get("fatal"):
+                return constants.REWARD_GAMEOVER
             return constants.REWARD_RED
         if kind in ("wall", "collision", "gameover"):
             return constants.REWARD_GAMEOVER

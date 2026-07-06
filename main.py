@@ -68,8 +68,14 @@ def run_session(env, interp, agent, learn, verbose, step_by_step,
             else:
                 _wait_step()
 
+        dist_before = interp.green_distance(env)
         event = env.step(action)
         reward = interp.get_reward(event)
+        # dist_after n'a de sens que sur un deplacement simple : apres avoir
+        # mange/perdu, le serpent peut etre vide ou la pomme a bouge.
+        dist_after = (interp.green_distance(env)
+                      if event["type"] == "nothing" else None)
+        reward += interp.approach_bonus(dist_before, dist_after, event["type"])
         stall = 0 if event["type"] == "green" else stall + 1
         done = env.is_game_over() or stall >= stall_limit
         next_state = None if done else interp.get_state(env)

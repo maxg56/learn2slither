@@ -118,8 +118,12 @@ class Environment:
             self.snake.pop()   # deplacement normal
             self.snake.pop()   # retrait du a la pomme rouge
             self._spawn_red()
+            # Une pomme rouge qui vide le serpent est un game over : on le
+            # signale (fatal) pour que l'interpreter applique la penalite de
+            # mort, et non le simple malus de pomme rouge.
             if len(self.snake) == 0:
                 self.done = True
+                return {"type": "red", "fatal": True}
             return {"type": "red"}
 
         self.snake.pop()
