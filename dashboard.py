@@ -122,8 +122,13 @@ class Dashboard:
         env = self.envs[i]
         state = self.states[i]
         action = self.agent.choose_action(state)
+        dist_before = self.interp.green_distance(env)
         event = env.step(action)
         reward = self.interp.get_reward(event)
+        dist_after = (self.interp.green_distance(env)
+                      if event["type"] == "nothing" else None)
+        reward += self.interp.approach_bonus(
+            dist_before, dist_after, event["type"])
         done = env.is_game_over()
 
         # Anti-blocage : on remet le compteur a zero quand le serpent mange,

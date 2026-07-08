@@ -49,6 +49,16 @@ REWARD_RED = -20
 REWARD_NOTHING = -1
 REWARD_GAMEOVER = -100
 
+# --- Reward shaping (rapprochement des pommes) -----------------------------
+# L'etat ne code la pomme verte que par un bit "visible / pas visible" (sans
+# distance) : avancer vers une pomme visible ne change pas l'etat et rapporte
+# le meme -1 que s'en eloigner. Sans gradient, le serpent erre et tourne en
+# rond au lieu de manger. On ajoute donc un bonus proportionnel a la reduction
+# de distance a la pomme verte visible la plus proche (rapprochement +, recul
+# -, distance inchangee 0). Calcule uniquement a partir des rayons de vision,
+# donc conforme a la contrainte "vision seule".
+REWARD_APPROACH = 1.0
+
 # --- Anti-blocage ----------------------------------------------------------
 # En exploitation pure (epsilon=0, modele charge), le serpent suit une
 # politique deterministe et peut tourner en rond indefiniment sans jamais
