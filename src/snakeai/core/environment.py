@@ -10,7 +10,7 @@ La tete du serpent est self.snake[0].
 
 import random
 
-import constants
+from snakeai import constants
 
 
 class Environment:
@@ -48,7 +48,7 @@ class Environment:
             # Le corps s'etend a l'oppose de la direction de la tete.
             cells = [(head[0] - i * dr, head[1] - i * dc)
                      for i in range(constants.SNAKE_START_LENGTH)]
-            if all(self._in_bounds(cell) for cell in cells):
+            if all(self.in_bounds(cell) for cell in cells):
                 self.snake = cells
                 self.direction = action
                 return
@@ -95,7 +95,7 @@ class Environment:
         new_head = (head_r + dr, head_c + dc)
 
         # Collision avec un mur.
-        if not self._in_bounds(new_head):
+        if not self.in_bounds(new_head):
             self.done = True
             return {"type": "wall"}
 
@@ -129,8 +129,12 @@ class Environment:
         self.snake.pop()
         return {"type": "nothing"}
 
-    def _in_bounds(self, cell):
-        """Indique si une case est a l'interieur du board."""
+    def in_bounds(self, cell):
+        """Indique si une case (ligne, colonne) est a l'interieur du board.
+
+        Publique : l'interpreter s'en sert pour tracer ses rayons de vision
+        sans avoir a connaitre la representation interne du board.
+        """
         r, c = cell
         return 0 <= r < self.size and 0 <= c < self.size
 

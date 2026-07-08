@@ -8,16 +8,23 @@ Ce fichier guide Claude Code lorsqu'il travaille sur ce dépôt.
 est contrôlé par un agent qui apprend par **Q-learning** (Q-table ou réseau de
 neurones, aucun autre modèle autorisé sous peine de 0).
 
-## Architecture (imposée par le sujet)
+## Architecture
 
-Le programme doit être modulaire, avec une séparation stricte :
+Le code est un paquet Python installable sous `src/snakeai/`. La séparation
+stricte imposée par le sujet est conservée, chaque responsabilité vivant dans
+son sous-paquet :
 
-- `environment.py` — le board et les règles du jeu (aucune logique d'apprentissage)
-- `interpreter.py` — calcule l'état (vision du snake) et les rewards à partir du board
-- `agent.py` — Q-learning : Q-table, epsilon-greedy, update, choix de l'action
-- `display.py` — interface graphique (pygame) : vitesse configurable + mode step-by-step
-- `main.py` / `snake` — point d'entrée, parsing CLI, boucle d'entraînement
+- `core/environment.py` — le board et les règles du jeu (aucune logique d'apprentissage)
+- `perception/interpreter.py` — calcule l'état (vision du snake) et les rewards
+- `learning/agent.py` — Q-learning : Q-table, epsilon-greedy, update, choix de l'action
+- `training/trainer.py` — boucle d'entraînement (`run_session`, `train`) assemblant le flux
+- `ui/display.py` — interface graphique pygame : vitesse configurable + step-by-step
+- `ui/dashboard/` — vue parallèle (bonus), découpée en `simulation` (logique, sans
+  pygame), `renderer` (dessin), `theme` (couleurs/layout) et `app` (orchestration)
+- `cli.py` — point d'entrée : parsing CLI et câblage des composants
 - `models/` — modèles sauvegardés (obligatoire : 1, 10 et 100 sessions minimum)
+
+Point d'entrée : `./snake` (wrapper) → `python -m snakeai` → `snakeai.cli:main`.
 
 Flux : Environment → Interpreter (state + reward) → Agent (action) → Environment.
 
@@ -92,6 +99,12 @@ flake8 .
   game over -100.
 - La Q-table est un dict `{state: [q_up, q_left, q_down, q_right]}`, sérialisée
   en JSON dans les fichiers modèles.
+
+## Convention de commits
+
+- Ne pas ajouter Claude comme co-auteur des commits. N'inclure aucune ligne
+  `Co-Authored-By: Claude ...` ni mention de génération par Claude dans les
+  messages de commit ou les descriptions de PR.
 
 ## Bonus (seulement si le mandatory est parfait)
 

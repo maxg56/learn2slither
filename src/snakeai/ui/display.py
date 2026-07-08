@@ -7,7 +7,7 @@ entierement desactivable via `-visual off`.
 
 import pygame
 
-import constants
+from snakeai import constants
 
 # Couleurs (R, V, B).
 COLOR_BG = (18, 18, 24)

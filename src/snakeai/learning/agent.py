@@ -9,7 +9,7 @@ import ast
 import json
 import random
 
-import constants
+from snakeai import constants
 
 
 class Agent:

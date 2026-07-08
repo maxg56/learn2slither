@@ -10,14 +10,9 @@ une IndexError (crash = 0 a l'evaluation). On verifie ici :
   4. une session complete se joue sans exception dans ce scenario.
 """
 
-import os
-import sys
-
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-import constants                                # noqa: E402
-from environment import Environment            # noqa: E402
-from interpreter import Interpreter            # noqa: E402
+from snakeai import constants
+from snakeai.core import Environment
+from snakeai.perception import Interpreter
 
 
 def _one_length_snake_next_to_red():
