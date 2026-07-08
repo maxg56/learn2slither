@@ -2,3 +2,9 @@ venv/
 .venv/
 __pycache__/
 *.pyc
+
+# Metadonnees d'installation editable (setuptools)
+*.egg-info/
+
+# Snapshots auto-sauvegardes par le dashboard (artefacts d'entrainement)
+models/model_gen*.txt

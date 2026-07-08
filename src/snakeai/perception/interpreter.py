@@ -6,7 +6,7 @@ et calcule la recompense de la transition. L'agent ne recoit QUE cette
 vision (jamais les coordonnees absolues ni la grille complete).
 """
 
-import constants
+from snakeai import constants
 
 
 class Interpreter:
@@ -32,7 +32,7 @@ class Interpreter:
         r, c = env.snake[0]
         cells = []
         r, c = r + dr, c + dc
-        while env._in_bounds((r, c)):
+        while env.in_bounds((r, c)):
             cells.append(self._cell_char(env, (r, c)))
             r, c = r + dr, c + dc
         cells.append(constants.CELL_WALL)
