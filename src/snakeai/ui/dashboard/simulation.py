@@ -10,6 +10,7 @@ from collections import deque
 
 from snakeai import constants
 from snakeai.core import Environment
+from snakeai.training import StatsHistory, save_model
 
 
 class Simulation:
@@ -43,6 +44,9 @@ class Simulation:
         self.best_length = max(self.cur_max_len)
         self.best_duration = 0
         self.recent_lengths = deque(maxlen=200)
+        self.recent_durations = deque(maxlen=200)
+        # Historique borne pour les courbes live du dashboard.
+        self.history = StatsHistory()
 
     # -- Avancement --------------------------------------------------------
     def step_all(self, steps_per_frame):
@@ -92,9 +96,17 @@ class Simulation:
         """Cloture une partie : cumule les stats et relance un board neuf."""
         self.best_duration = max(self.best_duration, self.durations[i])
         self.recent_lengths.append(self.cur_max_len[i])
+        self.recent_durations.append(self.durations[i])
         self.episodes += 1
         if self.learn:
             self.agent.decay_epsilon()
+        self.history.record(
+            self.episodes,
+            avg_length=self.recent_average(),
+            max_length=self.best_length,
+            avg_duration=self.recent_duration_average(),
+            epsilon=self.agent.epsilon,
+        )
         env = self.envs[i]
         env.reset()
         self.states[i] = self.interp.get_state(env)
@@ -114,6 +126,12 @@ class Simulation:
             return 0.0
         return sum(self.recent_lengths) / len(self.recent_lengths)
 
+    def recent_duration_average(self):
+        """Duree moyenne des dernieres parties (0.0 si aucune)."""
+        if not self.recent_durations:
+            return 0.0
+        return sum(self.recent_durations) / len(self.recent_durations)
+
     # -- Apprentissage / persistance --------------------------------------
     def toggle_learn(self):
         """Gele/reactive l'apprentissage et retourne l'etat resultant."""
@@ -127,11 +145,11 @@ class Simulation:
         return self.learn
 
     def save(self):
-        """Enregistre le modele (nom tagge du nombre de generations).
+        """Enregistre le modele (JSON) et ses metriques (CSV lie).
 
-        Retourne le chemin ecrit en cas de succes, None sinon.
+        Le nom est tagge du nombre de generations. Retourne le chemin ecrit
+        en cas de succes, None sinon.
         """
-        root, ext = os.path.splitext(self.save_path)
-        ext = ext or ".txt"
-        path = "{}_gen{}{}".format(root, self.episodes, ext)
-        return path if self.agent.save(path) else None
+        root, _ = os.path.splitext(self.save_path)
+        path = "{}_gen{}.json".format(root, self.episodes)
+        return save_model(self.agent, path, self.history)

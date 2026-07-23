@@ -5,7 +5,10 @@ Agent (action) -> Environment. Ne contient ni regles du jeu, ni logique de
 Q-learning : il ne fait que les faire dialoguer, session apres session.
 """
 
+from collections import deque
+
 from snakeai import constants
+from snakeai.training.stats import StatsHistory
 
 
 def run_session(env, interp, agent, learn, verbose, step_by_step,
@@ -70,15 +73,20 @@ def _wait_step():
 
 
 def train(env, interp, agent, args, display=None):
-    """Enchaine les sessions d'entrainement et retourne (best_len, best_dur).
+    """Enchaine les sessions et retourne (best_len, best_dur, history).
 
     Applique le decay d'epsilon apres chaque session (sauf en `-dontlearn`),
     imprime le bilan de chaque partie et s'arrete si l'affichage est ferme.
+    `history` est un `StatsHistory` echantillonne (une mesure par session) que
+    la CLI sauvegarde en CSV a cote du modele pour la visualisation ulterieure.
     """
     learn = not args.dontlearn
     verbose = args.visual == "on" or args.step_by_step
     best_length = 0
     best_duration = 0
+    history = StatsHistory()
+    recent_lengths = deque(maxlen=100)
+    recent_durations = deque(maxlen=100)
 
     for session in range(1, args.sessions + 1):
         length, duration = run_session(
@@ -89,9 +97,18 @@ def train(env, interp, agent, args, display=None):
             agent.decay_epsilon()
         best_length = max(best_length, length)
         best_duration = max(best_duration, duration)
+        recent_lengths.append(length)
+        recent_durations.append(duration)
+        history.record(
+            session,
+            avg_length=sum(recent_lengths) / len(recent_lengths),
+            max_length=best_length,
+            avg_duration=sum(recent_durations) / len(recent_durations),
+            epsilon=agent.epsilon,
+        )
         print("Session {}/{} - Game over, max length = {}, max duration = {}"
               .format(session, args.sessions, length, duration))
         if display is not None and display.should_quit():
             break
 
-    return best_length, best_duration
+    return best_length, best_duration, history

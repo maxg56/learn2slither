@@ -11,7 +11,7 @@ import sys
 from snakeai.core import Environment
 from snakeai.learning import Agent
 from snakeai.perception import Interpreter
-from snakeai.training import train
+from snakeai.training import save_model, train
 
 
 def parse_args(argv=None):
@@ -54,13 +54,14 @@ def main():
 
     display = _make_display(args.visual == "on")
     env = Environment()
-    best_length, best_duration = train(env, interp, agent, args, display)
+    best_length, best_duration, history = train(
+        env, interp, agent, args, display)
     if display is not None:
         display.close()
 
     print("Game over, max length = {}, max duration = {}"
           .format(best_length, best_duration))
-    _save_model(agent, args.save)
+    _save_model(agent, args.save, history)
 
 
 def _build_agent(args):
@@ -77,12 +78,19 @@ def _build_agent(args):
     return agent
 
 
-def _save_model(agent, path):
-    """Sauvegarde le modele si un chemin est fourni (jamais de crash)."""
+def _save_model(agent, path, history=None):
+    """Sauvegarde le modele (JSON) et ses metriques (CSV lie) si demande.
+
+    Le chemin est force en .json ; le CSV part dans data/ et son nom est
+    inscrit dans le JSON. Jamais de crash.
+    """
     if not path:
         return
-    if agent.save(path):
-        print("Modele sauvegarde dans {}".format(path))
+    written = save_model(agent, path, history)
+    if written:
+        print("Modele sauvegarde dans {}".format(written))
+        if agent.data_path:
+            print("Metriques sauvegardees dans data/")
     else:
         print("Avertissement : echec de la sauvegarde dans {}"
               .format(path), file=sys.stderr)

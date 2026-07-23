@@ -21,6 +21,8 @@ class Agent:
         self.gamma = gamma
         self.epsilon = epsilon
         self.q_table = {}
+        # Chemin du CSV de metriques lie, renseigne au chargement s'il existe.
+        self.data_path = None
 
     def _qvalues(self, state):
         """Retourne (en l'initialisant au besoin) les Q-values d'un etat."""
@@ -60,8 +62,12 @@ class Agent:
         self.epsilon = max(constants.EPSILON_MIN,
                            self.epsilon * constants.EPSILON_DECAY)
 
-    def save(self, path):
+    def save(self, path, data_path=None):
         """Serialise tout l'etat d'apprentissage dans un fichier JSON.
+
+        `data_path`, s'il est fourni, est enregistre dans le champ "data" :
+        c'est le chemin du CSV de metriques lie, ecrit en parallele. Le modele
+        et ses donnees restent ainsi separes mais relies par ce champ.
 
         Tolerant aux chemins invalides (jamais de crash). Retourne True si
         la sauvegarde a reussi, False sinon.
@@ -73,9 +79,12 @@ class Agent:
             "q_table": {str(state): values
                         for state, values in self.q_table.items()},
         }
+        if data_path is not None:
+            data["data"] = data_path
         try:
             with open(path, "w") as handle:
                 json.dump(data, handle)
+            self.data_path = data_path
             return True
         except OSError:
             return False
@@ -92,6 +101,7 @@ class Agent:
             self.alpha = data.get("alpha", self.alpha)
             self.gamma = data.get("gamma", self.gamma)
             self.epsilon = data.get("epsilon", self.epsilon)
+            self.data_path = data.get("data")
             self.q_table = {
                 ast.literal_eval(state): list(values)
                 for state, values in data.get("q_table", {}).items()

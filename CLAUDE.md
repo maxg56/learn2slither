@@ -78,14 +78,14 @@ pip install -r requirements.txt   # pygame, numpy, flake8
 # Lint (obligatoire avant tout commit)
 flake8 .
 
-# Entraînement des modèles à livrer
-./snake -sessions 1 -save models/1sess.txt -visual off
-./snake -sessions 10 -save models/10sess.txt -visual off
-./snake -sessions 100 -save models/100sess.txt -visual off
-./snake -sessions 1000 -save models/1000sess.txt -visual off
+# Entraînement des modèles à livrer (sauvegardés en .json)
+./snake -sessions 1 -save models/1sess.json -visual off
+./snake -sessions 10 -save models/10sess.json -visual off
+./snake -sessions 100 -save models/100sess.json -visual off
+./snake -sessions 1000 -save models/1000sess.json -visual off
 
 # Évaluation d'un modèle sans altérer son apprentissage
-./snake -load models/100sess.txt -sessions 10 -dontlearn -visual on
+./snake -load models/1000sess.json -sessions 10 -dontlearn -visual on
 ```
 
 ## Notes d'implémentation

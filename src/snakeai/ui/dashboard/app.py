@@ -35,6 +35,7 @@ class Dashboard:
         # partie en grand pour l'observer, plutot que la grille entiere.
         self.focus = not learn
         self.locked_index = None    # None = suit le leader ; int = fige 1
+        self.show_stats = False     # ecran de courbes d'entrainement (live)
         self.status = ""
         self.status_frames = 0
         self.clock = pygame.time.Clock()
@@ -92,6 +93,8 @@ class Dashboard:
             self._focus_best()
         elif r.btn_freeze.collidepoint(pos):
             self._toggle_freeze()
+        elif r.btn_stats.collidepoint(pos):
+            self.show_stats = not self.show_stats
         else:
             idx = r.board_at(*pos)
             if idx is not None:
@@ -121,6 +124,8 @@ class Dashboard:
             self._cycle_focus(1)
         elif key == pygame.K_l:
             self._toggle_freeze()
+        elif key == pygame.K_g:
+            self.show_stats = not self.show_stats
         elif key == pygame.K_s:
             self._save()
 
