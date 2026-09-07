@@ -86,21 +86,41 @@ class Agent:
     def load(self, path):
         """Recharge un etat d'apprentissage depuis un fichier JSON.
 
-        Tolerant aux fichiers absents ou corrompus (jamais de crash).
+        Tolerant aux fichiers absents ou corrompus (jamais de crash), y
+        compris un JSON syntaxiquement valide mais de forme incorrecte
+        (q_table de mauvaise taille/type, hyperparametres non numeriques).
+        La validation se fait sur des variables locales : en cas d'echec,
+        l'etat actuel de l'agent n'est jamais modifie.
         Retourne True si le chargement a reussi, False sinon.
         """
         try:
             with open(path, "r") as handle:
                 data = json.load(handle)
-            self.alpha = data.get("alpha", self.alpha)
-            self.gamma = data.get("gamma", self.gamma)
-            self.epsilon = data.get("epsilon", self.epsilon)
-            self.epsilon_decay = data.get("epsilon_decay",
-                                          self.epsilon_decay)
-            self.q_table = {
-                ast.literal_eval(state): list(values)
-                for state, values in data.get("q_table", {}).items()
-            }
+            alpha = data.get("alpha", self.alpha)
+            gamma = data.get("gamma", self.gamma)
+            epsilon = data.get("epsilon", self.epsilon)
+            epsilon_decay = data.get("epsilon_decay", self.epsilon_decay)
+            if not all(isinstance(v, (int, float))
+                       for v in (alpha, gamma, epsilon, epsilon_decay)):
+                return False
+            raw_q_table = data.get("q_table", {})
+            if not isinstance(raw_q_table, dict):
+                return False
+            q_table = {}
+            for state, values in raw_q_table.items():
+                parsed_state = ast.literal_eval(state)
+                if not isinstance(parsed_state, tuple):
+                    return False
+                values = list(values)
+                if len(values) != len(constants.ACTIONS) or not all(
+                        isinstance(v, (int, float)) for v in values):
+                    return False
+                q_table[parsed_state] = values
+            self.alpha = alpha
+            self.gamma = gamma
+            self.epsilon = epsilon
+            self.epsilon_decay = epsilon_decay
+            self.q_table = q_table
             return True
-        except (OSError, ValueError, SyntaxError):
+        except (OSError, ValueError, SyntaxError, TypeError):
             return False
