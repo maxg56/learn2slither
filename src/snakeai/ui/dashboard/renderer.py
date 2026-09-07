@@ -10,6 +10,12 @@ import pygame
 from snakeai.ui.dashboard import theme
 from snakeai.ui.dashboard.theme import GAP, HEADER, SIDEBAR
 
+# Nombre de lignes de stats affichees dans la sidebar (voir _draw_sidebar)
+# et hauteur reservee au mini-graphe de longueur, juste au-dessus des
+# boutons.
+STAT_LINES = 8
+SPARKLINE_H = 46
+
 
 class Renderer:
     """Dessine header, sidebar et grille de boards ; gere la geometrie."""
@@ -23,9 +29,11 @@ class Renderer:
         self.board_px = board_size * cell_px + GAP
 
         pygame.init()
-        # Les boutons vivent sous les 7 lignes de stats : la fenetre doit
-        # etre assez haute pour les contenir, meme si la grille est petite.
-        self.btn_y = HEADER + 16 + 7 * 46 + 8
+        # Les boutons vivent sous les lignes de stats et le sparkline : la
+        # fenetre doit etre assez haute pour les contenir, meme si la
+        # grille est petite.
+        self.btn_y = (HEADER + 16 + STAT_LINES * 46
+                      + SPARKLINE_H + 12)
         sidebar_needed = self.btn_y + 2 * 40 + 12
         width = SIDEBAR + cols * self.board_px + GAP
         height = max(HEADER + rows * self.board_px + GAP, sidebar_needed)
@@ -80,6 +88,28 @@ class Renderer:
                 pygame.draw.rect(self.screen, theme.COLOR_LEADER, frame, 2)
         if dash.focus:
             self._draw_spotlight(dash, dash.focus_index())
+        if dash.show_config:
+            self._draw_config_panel(dash)
+        pygame.display.flip()
+
+    def draw_lobby(self, dash):
+        """Ecran de choix du modele, affiche avant la grille (bonus)."""
+        self.screen.fill(theme.COLOR_BG)
+        title = "Learn2Slither - choisir un modele"
+        self.screen.blit(self.font.render(title, True, theme.COLOR_TEXT),
+                         (20, 18))
+        hint = ("[haut/bas] naviguer   [entree] charger   "
+                "[echap] nouveau modele")
+        self.screen.blit(self.small.render(hint, True, theme.COLOR_DIM),
+                         (20, 42))
+        y = 78
+        for i, label in enumerate(dash.lobby_entries()):
+            active = i == dash.lobby_index
+            color = theme.COLOR_SELECT if active else theme.COLOR_TEXT
+            prefix = "> " if active else "  "
+            self.screen.blit(
+                self.small.render(prefix + label, True, color), (24, y))
+            y += 22
         pygame.display.flip()
 
     def _draw_board_at(self, env, gx, gy, px):
@@ -141,7 +171,7 @@ class Renderer:
         state = ("PAUSE" if dash.paused
                  else "x{}".format(dash.steps_per_frame))
         hint = ("[espace] pause  [+/-] vitesse  [fleches <>] partie  "
-                "[B] meilleure  [L] geler  [S] save  " + state)
+                "[B] meilleure  [L] geler  [S] save  [C] config  " + state)
         self.screen.blit(self.small.render(hint, True, theme.COLOR_DIM),
                          (12, 26))
 
@@ -158,6 +188,7 @@ class Renderer:
             ("Longueur max", str(sim.best_length)),
             ("Duree max", str(sim.best_duration)),
             ("Long. moy (200)", "{:.1f}".format(sim.recent_average())),
+            ("Taux survie (200)", "{:.0%}".format(sim.survival_rate())),
             ("Apprentissage", "on" if sim.learn else "off"),
         ]
         y = HEADER + 16
@@ -167,7 +198,58 @@ class Renderer:
             self.screen.blit(self.font.render(value, True, theme.COLOR_TEXT),
                              (14, y + 16))
             y += 46
+        self._draw_sparkline(dash, 14, y, SIDEBAR - 28, SPARKLINE_H - 6)
         self._draw_buttons(dash)
+
+    def _draw_sparkline(self, dash, x, y, w, h):
+        """Mini-graphe (lignes plein pygame) de la longueur des dernieres
+        parties, tire de `Simulation.recent_lengths`."""
+        pygame.draw.rect(self.screen, theme.COLOR_BOARD_BG,
+                         pygame.Rect(x, y, w, h))
+        pygame.draw.rect(self.screen, theme.COLOR_DIM,
+                         pygame.Rect(x, y, w, h), 1)
+        label = self.small.render("Long. (200 dernieres)", True,
+                                  theme.COLOR_DIM)
+        self.screen.blit(label, (x + 4, y + 2))
+        lengths = list(dash.sim.recent_lengths)
+        if len(lengths) < 2:
+            return
+        lo, hi = min(lengths), max(lengths)
+        span = max(1, hi - lo)
+        n = len(lengths)
+        top = y + 18
+        plot_h = max(4, h - 20)
+        points = []
+        for i, value in enumerate(lengths):
+            px = x + 4 + int(i * (w - 8) / (n - 1))
+            py = top + plot_h - int((value - lo) * plot_h / span)
+            points.append((px, py))
+        for a, b in zip(points, points[1:]):
+            pygame.draw.line(self.screen, theme.COLOR_LEADER, a, b, 2)
+
+    def _draw_config_panel(self, dash):
+        """Panneau de config (bascule [C]) : vitesse et epsilon reglables."""
+        sim = dash.sim
+        panel_w, panel_h = 270, 130
+        px = self.screen.get_width() - panel_w - 16
+        py = HEADER + 16
+        pygame.draw.rect(self.screen, theme.COLOR_PANEL,
+                         pygame.Rect(px, py, panel_w, panel_h))
+        pygame.draw.rect(self.screen, theme.COLOR_SELECT,
+                         pygame.Rect(px, py, panel_w, panel_h), 2)
+        lines = [
+            "Panneau de config  [C] fermer",
+            "Vitesse : x{}  ([+]/[-])".format(dash.steps_per_frame),
+            "Epsilon : {:.3f}  ([haut]/[bas])".format(sim.agent.epsilon),
+            "",
+            "Taille de board : fixee au lancement",
+            "(-grid / constructeur), non modifiable ici.",
+        ]
+        y = py + 10
+        for line in lines:
+            self.screen.blit(self.small.render(line, True, theme.COLOR_TEXT),
+                             (px + 12, y))
+            y += 20
 
     def _draw_buttons(self, dash):
         """Dessine les boutons cliquables (navigation, sauvegarde, gel)."""

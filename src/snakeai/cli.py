@@ -11,7 +11,7 @@ import sys
 
 from snakeai import constants
 from snakeai.core import Environment
-from snakeai.learning import Agent
+from snakeai.learning import Agent, NNAgent
 from snakeai.perception import Interpreter
 from snakeai.training import train
 
@@ -42,6 +42,8 @@ def parse_args(argv=None):
                         help="vue parallele : une grille de parties a la fois")
     parser.add_argument("-grid", type=int, default=6,
                         help="cote de la grille du dashboard (grid x grid)")
+    parser.add_argument("-model", choices=["qtable", "nn"], default="qtable",
+                        help="fonction Q utilisee : Q-table ou reseau NN")
     parser.add_argument("-seed", type=int, default=None,
                         help="graine aleatoire pour des runs reproductibles")
     parser.add_argument("-board-size", dest="board_size", type=int,
@@ -53,6 +55,10 @@ def parse_args(argv=None):
                         choices=["default", "alt"], default="default",
                         help="schema de reward : historique ou alternatif "
                              "(anti demi-tour + bonus de survie)")
+    parser.add_argument("-dashboard-lobby", dest="dashboard_lobby",
+                        action="store_true",
+                        help="affiche un lobby de choix de modele avant "
+                             "de lancer le dashboard (-dashboard requis)")
     return parser.parse_args(argv)
 
 
@@ -92,7 +98,7 @@ def main():
 
 def _build_agent(args):
     """Cree l'agent, charge un modele et applique le mode -dontlearn."""
-    agent = Agent()
+    agent = NNAgent() if args.model == "nn" else Agent()
     if args.load:
         if agent.load(args.load):
             print("Modele charge depuis {}".format(args.load))
@@ -142,7 +148,8 @@ def _run_dashboard(agent, interp, learn, args):
     try:
         from snakeai.ui.dashboard import Dashboard
         board = Dashboard(agent, interp, cols=args.grid, rows=args.grid,
-                          learn=learn, save_path=args.save)
+                          learn=learn, save_path=args.save,
+                          start_lobby=args.dashboard_lobby)
         board.run()
     except Exception as error:      # pragma: no cover - depend de l'env
         print("Avertissement : dashboard indisponible ({})".format(error),
