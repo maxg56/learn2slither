@@ -13,7 +13,9 @@ from snakeai import constants
 from snakeai.core import Environment
 from snakeai.learning import Agent, NNAgent
 from snakeai.perception import Interpreter
-from snakeai.training import train
+from snakeai.training import run_session, train
+from snakeai.training.replay import replay as replay_recording
+from snakeai.training.replay import save_recording
 
 # Paliers de longueur du bonus "Records atteints" (cf. sujet 42).
 LENGTH_MILESTONES = (15, 20, 25, 30, 35)
@@ -42,6 +44,11 @@ def parse_args(argv=None):
                         help="vue parallele : une grille de parties a la fois")
     parser.add_argument("-grid", type=int, default=6,
                         help="cote de la grille du dashboard (grid x grid)")
+    parser.add_argument("-record", metavar="PATH",
+                        help="enregistre une session unique (frames) vers"
+                             " PATH")
+    parser.add_argument("-replay", metavar="PATH",
+                        help="rejoue un enregistrement -record, sans agent")
     parser.add_argument("-model", choices=["qtable", "nn"], default="qtable",
                         help="fonction Q utilisee : Q-table ou reseau NN")
     parser.add_argument("-seed", type=int, default=None,
@@ -71,6 +78,10 @@ def main():
         # donc suffisant pour rendre un run reproductible.
         random.seed(args.seed)
 
+    if args.replay:
+        _run_replay(args)
+        return
+
     agent = _build_agent(args)
     learn = not args.dontlearn
     interp = Interpreter(reward_mode=args.reward_shaping)
@@ -83,17 +94,21 @@ def main():
     size = args.board_size if args.board_size is not None \
         else constants.BOARD_SIZE
     env = Environment(size=size)
-    best_length, best_duration, lengths, durations = train(
-        env, interp, agent, args, display)
+
+    if args.record:
+        _run_recorded_session(env, interp, agent, learn, args, display)
+    else:
+        best_length, best_duration, lengths, durations = train(
+            env, interp, agent, args, display)
+        print("Game over, max length = {}, max duration = {}"
+              .format(best_length, best_duration))
+        _print_records(best_length)
+        if args.benchmark:
+            _print_benchmark(lengths, durations)
+        _save_model(agent, args.save)
+
     if display is not None:
         display.close()
-
-    print("Game over, max length = {}, max duration = {}"
-          .format(best_length, best_duration))
-    _print_records(best_length)
-    if args.benchmark:
-        _print_benchmark(lengths, durations)
-    _save_model(agent, args.save)
 
 
 def _build_agent(args):
@@ -119,6 +134,41 @@ def _save_model(agent, path):
     else:
         print("Avertissement : echec de la sauvegarde dans {}"
               .format(path), file=sys.stderr)
+
+
+def _run_recorded_session(env, interp, agent, learn, args, display):
+    """Joue une session unique en enregistrant chaque frame vers -record.
+
+    L'agent joue normalement (honore -dontlearn/-load) ; seule la boucle
+    multi-sessions de `train()` est court-circuitee, puisqu'un
+    enregistrement ne porte que sur une seule partie.
+    """
+    verbose = args.visual == "on" or args.step_by_step
+    frames = []
+    length, duration = run_session(
+        env, interp, agent, learn, verbose, args.step_by_step, display,
+        record=frames,
+    )
+    if learn:
+        agent.decay_epsilon()
+    print("Game over, max length = {}, max duration = {}"
+          .format(length, duration))
+    save_recording(args.record, frames, env.size)
+    print("Partie enregistree dans {} ({} frames)"
+          .format(args.record, len(frames)))
+    _save_model(agent, args.save)
+
+
+def _run_replay(args):
+    """Rejoue un enregistrement -record : pure lecture, sans agent ni RNG."""
+    display = _make_display(args.visual == "on")
+    try:
+        played = replay_recording(args.replay, display=display,
+                                  step_by_step=args.step_by_step)
+    finally:
+        if display is not None:
+            display.close()
+    print("Replay termine, {} frames rejouees".format(played))
 
 
 def _print_records(best_length):

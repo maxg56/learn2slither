@@ -9,8 +9,13 @@ from snakeai import constants
 
 
 def run_session(env, interp, agent, learn, verbose, step_by_step,
-                display=None):
-    """Joue une partie complete et retourne (longueur_max, duree)."""
+                display=None, record=None):
+    """Joue une partie complete et retourne (longueur_max, duree).
+
+    Si `record` est une liste, une entree JSON-serialisable est ajoutee
+    avant chaque action (avant que l'environnement n'avance), pour permettre
+    un replay exact de la partie sans dependre de l'agent ni du RNG.
+    """
     env.reset()
     state = interp.get_state(env)
     max_length = len(env.snake)
@@ -28,6 +33,13 @@ def run_session(env, interp, agent, learn, verbose, step_by_step,
             if display.should_quit():
                 break
         action = agent.choose_action(state)
+        if record is not None:
+            record.append({
+                "snake": [list(cell) for cell in env.snake],
+                "green_apples": [list(cell) for cell in env.green_apples],
+                "red_apples": [list(cell) for cell in env.red_apples],
+                "action": action,
+            })
         if verbose:
             print("Action:", constants.ACTION_NAMES[action])
             print()
