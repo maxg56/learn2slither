@@ -59,6 +59,34 @@ REWARD_GAMEOVER = -100
 # donc conforme a la contrainte "vision seule".
 REWARD_APPROACH = 1.0
 
+# --- Reward shaping alternatif ("alt", selectionnable) ----------------------
+# Schema alternatif optionnel, active via -reward-shaping alt / via
+# Interpreter(reward_mode="alt"). Le mode "default" (aucun flag, comportement
+# historique) reste strictement identique aux valeurs ci-dessus : ces deux
+# constantes ne sont lues que lorsque reward_mode == "alt".
+
+# Anti demi-tour : penalite quand l'action choisie est l'exact oppose de la
+# direction courante du serpent (rebrousser chemin droit dans son propre
+# cou). Cette information provient uniquement de la derniere action de
+# l'agent et de la direction dans laquelle il se deplacait deja (un fait que
+# l'agent connait de lui-meme, independant du board) : aucune coordonnee,
+# grille ou position de pomme supplementaire n'est fournie, donc conforme a
+# la contrainte "vision seule". En pratique, un demi-tour percute toujours
+# immediatement le cou du serpent (collision deja sanctionnee par
+# REWARD_GAMEOVER) : cette penalite additionnelle donne un signal associe a
+# l'action elle-meme, qui se propage plus vite dans la Q-table que le seul
+# reward terminal.
+REWARD_UTURN = -10
+
+# Bonus de survie : petit bonus ajoute a REWARD_NOTHING (pas un remplacement)
+# sur chaque pas "nothing", pour alleger le cout de la simple survie. Reste
+# tres inferieur a REWARD_GREEN (20) et tres petit face a REWARD_GAMEOVER
+# (-100) : il ne peut donc pas inciter l'agent a eviter les pommes ou a
+# provoquer sa propre mort pour "farmer" ce bonus. But : encourager une duree
+# de vie plus longue (cf. objectif du sujet) sans desinciter la recherche de
+# pommes vertes, qui restent bien plus rentables.
+REWARD_SURVIVAL_BONUS = 0.2
+
 # --- Anti-blocage ----------------------------------------------------------
 # En exploitation pure (epsilon=0, modele charge), le serpent suit une
 # politique deterministe et peut tourner en rond indefiniment sans jamais

@@ -49,6 +49,10 @@ def parse_args(argv=None):
                         help="cote du board (defaut : constants.BOARD_SIZE)")
     parser.add_argument("-benchmark", action="store_true",
                         help="agrege longueur/duree de toutes les sessions")
+    parser.add_argument("-reward-shaping", dest="reward_shaping",
+                        choices=["default", "alt"], default="default",
+                        help="schema de reward : historique ou alternatif "
+                             "(anti demi-tour + bonus de survie)")
     return parser.parse_args(argv)
 
 
@@ -63,7 +67,7 @@ def main():
 
     agent = _build_agent(args)
     learn = not args.dontlearn
-    interp = Interpreter()
+    interp = Interpreter(reward_mode=args.reward_shaping)
 
     if args.dashboard:
         _run_dashboard(agent, interp, learn, args)
