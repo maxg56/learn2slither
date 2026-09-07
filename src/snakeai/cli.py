@@ -11,7 +11,7 @@ import sys
 
 from snakeai import constants
 from snakeai.core import Environment
-from snakeai.learning import Agent
+from snakeai.learning import Agent, NNAgent
 from snakeai.perception import Interpreter
 from snakeai.training import train
 
@@ -42,6 +42,8 @@ def parse_args(argv=None):
                         help="vue parallele : une grille de parties a la fois")
     parser.add_argument("-grid", type=int, default=6,
                         help="cote de la grille du dashboard (grid x grid)")
+    parser.add_argument("-model", choices=["qtable", "nn"], default="qtable",
+                        help="fonction Q utilisee : Q-table ou reseau NN")
     parser.add_argument("-seed", type=int, default=None,
                         help="graine aleatoire pour des runs reproductibles")
     parser.add_argument("-board-size", dest="board_size", type=int,
@@ -92,7 +94,7 @@ def main():
 
 def _build_agent(args):
     """Cree l'agent, charge un modele et applique le mode -dontlearn."""
-    agent = Agent()
+    agent = NNAgent() if args.model == "nn" else Agent()
     if args.load:
         if agent.load(args.load):
             print("Modele charge depuis {}".format(args.load))
