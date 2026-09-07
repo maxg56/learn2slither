@@ -49,6 +49,10 @@ def parse_args(argv=None):
                         help="cote du board (defaut : constants.BOARD_SIZE)")
     parser.add_argument("-benchmark", action="store_true",
                         help="agrege longueur/duree de toutes les sessions")
+    parser.add_argument("-dashboard-lobby", dest="dashboard_lobby",
+                        action="store_true",
+                        help="affiche un lobby de choix de modele avant "
+                             "de lancer le dashboard (-dashboard requis)")
     return parser.parse_args(argv)
 
 
@@ -138,7 +142,8 @@ def _run_dashboard(agent, interp, learn, args):
     try:
         from snakeai.ui.dashboard import Dashboard
         board = Dashboard(agent, interp, cols=args.grid, rows=args.grid,
-                          learn=learn, save_path=args.save)
+                          learn=learn, save_path=args.save,
+                          start_lobby=args.dashboard_lobby)
         board.run()
     except Exception as error:      # pragma: no cover - depend de l'env
         print("Avertissement : dashboard indisponible ({})".format(error),
