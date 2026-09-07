@@ -16,10 +16,12 @@ class Agent:
     """Agent Q-learning avec politique epsilon-greedy."""
 
     def __init__(self, alpha=constants.ALPHA, gamma=constants.GAMMA,
-                 epsilon=constants.EPSILON_START):
+                 epsilon=constants.EPSILON_START,
+                 epsilon_decay=constants.EPSILON_DECAY):
         self.alpha = alpha
         self.gamma = gamma
         self.epsilon = epsilon
+        self.epsilon_decay = epsilon_decay
         self.q_table = {}
 
     def _qvalues(self, state):
@@ -58,7 +60,7 @@ class Agent:
     def decay_epsilon(self):
         """Reduit epsilon vers sa valeur minimale."""
         self.epsilon = max(constants.EPSILON_MIN,
-                           self.epsilon * constants.EPSILON_DECAY)
+                           self.epsilon * self.epsilon_decay)
 
     def save(self, path):
         """Serialise tout l'etat d'apprentissage dans un fichier JSON.
@@ -70,6 +72,7 @@ class Agent:
             "alpha": self.alpha,
             "gamma": self.gamma,
             "epsilon": self.epsilon,
+            "epsilon_decay": self.epsilon_decay,
             "q_table": {str(state): values
                         for state, values in self.q_table.items()},
         }
@@ -96,8 +99,9 @@ class Agent:
             alpha = data.get("alpha", self.alpha)
             gamma = data.get("gamma", self.gamma)
             epsilon = data.get("epsilon", self.epsilon)
+            epsilon_decay = data.get("epsilon_decay", self.epsilon_decay)
             if not all(isinstance(v, (int, float))
-                       for v in (alpha, gamma, epsilon)):
+                       for v in (alpha, gamma, epsilon, epsilon_decay)):
                 return False
             raw_q_table = data.get("q_table", {})
             if not isinstance(raw_q_table, dict):
@@ -115,6 +119,7 @@ class Agent:
             self.alpha = alpha
             self.gamma = gamma
             self.epsilon = epsilon
+            self.epsilon_decay = epsilon_decay
             self.q_table = q_table
             return True
         except (OSError, ValueError, SyntaxError, TypeError):
