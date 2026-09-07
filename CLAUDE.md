@@ -37,7 +37,10 @@ Flux : Environment → Interpreter (state + reward) → Agent (action) → Envir
 2. **Modèle** : uniquement une Q-function (Q-table ou NN). Rien d'autre.
 3. **Affichage terminal obligatoire** : avant chaque action, afficher la vision
    (caractères `W` mur, `H` tête, `S` corps, `G` pomme verte, `R` pomme rouge,
-   `0` vide) puis l'action choisie.
+   `0` vide) puis l'action choisie. Cette obligation s'applique aux runs
+   `-visual on` / `-step-by-step` ; `-visual off` supprime volontairement
+   tout affichage par pas (y compris ce texte, pas seulement la fenêtre
+   pygame) pour garder l'entraînement en masse rapide.
 4. **Norme** : le code Python doit passer `flake8` sans erreur.
 5. Le programme ne doit jamais crasher (crash = 0 à l'évaluation).
 
@@ -62,7 +65,9 @@ Flags à supporter :
 - `-sessions N` — nombre de sessions d'entraînement
 - `-save PATH` / `-load PATH` — export/import du modèle (fichier unique contenant
   tout l'état d'apprentissage, principalement les Q-values)
-- `-visual on|off` — affichage graphique (off pour accélérer l'entraînement)
+- `-visual on|off` — affichage graphique (off pour accélérer l'entraînement) ;
+  `off` coupe aussi l'affichage terminal de la vision par pas (voir
+  contrainte 3), pas seulement la fenêtre pygame
 - `-dontlearn` — exploitation pure : epsilon=0, aucune mise à jour de la Q-function
 - `-step-by-step` — avance pas à pas
 
