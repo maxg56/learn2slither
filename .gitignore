@@ -8,3 +8,6 @@ __pycache__/
 
 # Snapshots auto-sauvegardes par le dashboard (artefacts d'entrainement)
 models/model_gen*.txt
+
+# Worktrees locaux crees par le harness Claude Code pour les sous-agents
+.claude/
