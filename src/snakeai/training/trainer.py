@@ -9,10 +9,14 @@ from snakeai import constants
 
 
 def run_session(env, interp, agent, learn, verbose, step_by_step,
-                display=None):
+                display=None, record=None):
     """Joue une partie complete.
 
     Retourne (longueur_max, duree, reward_cumule).
+
+    Si `record` est une liste, une entree JSON-serialisable est ajoutee
+    avant chaque action (avant que l'environnement n'avance), pour permettre
+    un replay exact de la partie sans dependre de l'agent ni du RNG.
     """
     env.reset()
     state = interp.get_state(env)
@@ -32,6 +36,13 @@ def run_session(env, interp, agent, learn, verbose, step_by_step,
             if display.should_quit():
                 break
         action = agent.choose_action(state)
+        if record is not None:
+            record.append({
+                "snake": [list(cell) for cell in env.snake],
+                "green_apples": [list(cell) for cell in env.green_apples],
+                "red_apples": [list(cell) for cell in env.red_apples],
+                "action": action,
+            })
         if verbose:
             print("Action:", constants.ACTION_NAMES[action])
             print()
@@ -75,7 +86,14 @@ def _wait_step():
 
 
 def train(env, interp, agent, args, display=None, recorder=None):
-    """Enchaine les sessions d'entrainement et retourne (best_len, best_dur).
+    """Enchaine les sessions d'entrainement.
+
+    Retourne (best_length, best_duration, lengths, durations) : les deux
+    premiers champs sont inchanges par rapport au comportement historique
+    (max sur toutes les sessions). Les deux derniers sont les listes brutes
+    par session, remplies uniquement si `args.benchmark` est vrai (sinon
+    listes vides) : elles permettent a l'appelant de calculer des stats
+    agregees (mode `-benchmark`) sans recalcul ni session supplementaire.
 
     Applique le decay d'epsilon apres chaque session (sauf en `-dontlearn`),
     imprime le bilan de chaque partie et s'arrete si l'affichage est ferme.
@@ -85,8 +103,11 @@ def train(env, interp, agent, args, display=None, recorder=None):
     """
     learn = not args.dontlearn
     verbose = args.visual == "on" or args.step_by_step
+    benchmark = getattr(args, "benchmark", False)
     best_length = 0
     best_duration = 0
+    lengths = []
+    durations = []
 
     for session in range(1, args.sessions + 1):
         length, duration, total_reward = run_session(
@@ -100,9 +121,12 @@ def train(env, interp, agent, args, display=None, recorder=None):
         if recorder is not None:
             recorder.record(
                 session, length, duration, agent.epsilon, total_reward)
+        if benchmark:
+            lengths.append(length)
+            durations.append(duration)
         print("Session {}/{} - Game over, max length = {}, max duration = {}"
               .format(session, args.sessions, length, duration))
         if display is not None and display.should_quit():
             break
 
-    return best_length, best_duration
+    return best_length, best_duration, lengths, durations
