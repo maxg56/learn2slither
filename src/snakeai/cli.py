@@ -6,12 +6,14 @@ et de deleguer soit au trainer, soit au dashboard.
 """
 
 import argparse
+import os
 import sys
+import tempfile
 
 from snakeai.core import Environment
 from snakeai.learning import Agent
 from snakeai.perception import Interpreter
-from snakeai.training import train
+from snakeai.training import MetricsRecorder, plot as plot_metrics, train
 
 
 def parse_args(argv=None):
@@ -37,6 +39,10 @@ def parse_args(argv=None):
                         help="vue parallele : une grille de parties a la fois")
     parser.add_argument("-grid", type=int, default=6,
                         help="cote de la grille du dashboard (grid x grid)")
+    parser.add_argument("-metrics", metavar="PATH",
+                        help="export CSV des courbes d'entrainement")
+    parser.add_argument("-plot", metavar="PATH",
+                        help="export PNG des courbes (necessite matplotlib)")
     return parser.parse_args(argv)
 
 
@@ -54,13 +60,16 @@ def main():
 
     display = _make_display(args.visual == "on")
     env = Environment()
-    best_length, best_duration = train(env, interp, agent, args, display)
+    recorder = MetricsRecorder() if (args.metrics or args.plot) else None
+    best_length, best_duration = train(env, interp, agent, args, display,
+                                       recorder)
     if display is not None:
         display.close()
 
     print("Game over, max length = {}, max duration = {}"
           .format(best_length, best_duration))
     _save_model(agent, args.save)
+    _export_metrics(recorder, args.metrics, args.plot)
 
 
 def _build_agent(args):
@@ -86,6 +95,46 @@ def _save_model(agent, path):
     else:
         print("Avertissement : echec de la sauvegarde dans {}"
               .format(path), file=sys.stderr)
+
+
+def _export_metrics(recorder, metrics_path, plot_path):
+    """Ecrit le CSV des courbes et, si demande, le plot (jamais de crash).
+
+    `-plot` sans `-metrics` passe par un CSV temporaire uniquement pour
+    alimenter `plot()`, qui lit depuis un fichier comme le reste du module.
+    """
+    if recorder is None:
+        return
+
+    csv_path = metrics_path
+    if metrics_path:
+        if recorder.save(metrics_path):
+            print("Metriques sauvegardees dans {}".format(metrics_path))
+        else:
+            print("Avertissement : echec de l'export des metriques dans {}"
+                  .format(metrics_path), file=sys.stderr)
+            csv_path = None
+
+    if not plot_path:
+        return
+
+    tmp_csv = None
+    if csv_path is None:
+        tmp_handle = tempfile.NamedTemporaryFile(
+            suffix=".csv", delete=False)
+        tmp_handle.close()
+        tmp_csv = tmp_handle.name
+        if not recorder.save(tmp_csv):
+            print("Avertissement : impossible de preparer les donnees "
+                  "du plot", file=sys.stderr)
+            os.unlink(tmp_csv)
+            return
+        csv_path = tmp_csv
+
+    if plot_metrics(csv_path, plot_path):
+        print("Graphique sauvegarde dans {}".format(plot_path))
+    if tmp_csv is not None:
+        os.unlink(tmp_csv)
 
 
 def _run_dashboard(agent, interp, learn, args):
