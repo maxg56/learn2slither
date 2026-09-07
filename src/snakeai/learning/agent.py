@@ -16,10 +16,12 @@ class Agent:
     """Agent Q-learning avec politique epsilon-greedy."""
 
     def __init__(self, alpha=constants.ALPHA, gamma=constants.GAMMA,
-                 epsilon=constants.EPSILON_START):
+                 epsilon=constants.EPSILON_START,
+                 epsilon_decay=constants.EPSILON_DECAY):
         self.alpha = alpha
         self.gamma = gamma
         self.epsilon = epsilon
+        self.epsilon_decay = epsilon_decay
         self.q_table = {}
 
     def _qvalues(self, state):
@@ -58,7 +60,7 @@ class Agent:
     def decay_epsilon(self):
         """Reduit epsilon vers sa valeur minimale."""
         self.epsilon = max(constants.EPSILON_MIN,
-                           self.epsilon * constants.EPSILON_DECAY)
+                           self.epsilon * self.epsilon_decay)
 
     def save(self, path):
         """Serialise tout l'etat d'apprentissage dans un fichier JSON.
@@ -70,6 +72,7 @@ class Agent:
             "alpha": self.alpha,
             "gamma": self.gamma,
             "epsilon": self.epsilon,
+            "epsilon_decay": self.epsilon_decay,
             "q_table": {str(state): values
                         for state, values in self.q_table.items()},
         }
@@ -83,19 +86,41 @@ class Agent:
     def load(self, path):
         """Recharge un etat d'apprentissage depuis un fichier JSON.
 
-        Tolerant aux fichiers absents ou corrompus (jamais de crash).
+        Tolerant aux fichiers absents ou corrompus (jamais de crash), y
+        compris un JSON syntaxiquement valide mais de forme incorrecte
+        (q_table de mauvaise taille/type, hyperparametres non numeriques).
+        La validation se fait sur des variables locales : en cas d'echec,
+        l'etat actuel de l'agent n'est jamais modifie.
         Retourne True si le chargement a reussi, False sinon.
         """
         try:
             with open(path, "r") as handle:
                 data = json.load(handle)
-            self.alpha = data.get("alpha", self.alpha)
-            self.gamma = data.get("gamma", self.gamma)
-            self.epsilon = data.get("epsilon", self.epsilon)
-            self.q_table = {
-                ast.literal_eval(state): list(values)
-                for state, values in data.get("q_table", {}).items()
-            }
+            alpha = data.get("alpha", self.alpha)
+            gamma = data.get("gamma", self.gamma)
+            epsilon = data.get("epsilon", self.epsilon)
+            epsilon_decay = data.get("epsilon_decay", self.epsilon_decay)
+            if not all(isinstance(v, (int, float))
+                       for v in (alpha, gamma, epsilon, epsilon_decay)):
+                return False
+            raw_q_table = data.get("q_table", {})
+            if not isinstance(raw_q_table, dict):
+                return False
+            q_table = {}
+            for state, values in raw_q_table.items():
+                parsed_state = ast.literal_eval(state)
+                if not isinstance(parsed_state, tuple):
+                    return False
+                values = list(values)
+                if len(values) != len(constants.ACTIONS) or not all(
+                        isinstance(v, (int, float)) for v in values):
+                    return False
+                q_table[parsed_state] = values
+            self.alpha = alpha
+            self.gamma = gamma
+            self.epsilon = epsilon
+            self.epsilon_decay = epsilon_decay
+            self.q_table = q_table
             return True
-        except (OSError, ValueError, SyntaxError):
+        except (OSError, ValueError, SyntaxError, TypeError):
             return False

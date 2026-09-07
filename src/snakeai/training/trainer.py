@@ -9,12 +9,20 @@ from snakeai import constants
 
 
 def run_session(env, interp, agent, learn, verbose, step_by_step,
-                display=None):
-    """Joue une partie complete et retourne (longueur_max, duree)."""
+                display=None, record=None):
+    """Joue une partie complete.
+
+    Retourne (longueur_max, duree, reward_cumule).
+
+    Si `record` est une liste, une entree JSON-serialisable est ajoutee
+    avant chaque action (avant que l'environnement n'avance), pour permettre
+    un replay exact de la partie sans dependre de l'agent ni du RNG.
+    """
     env.reset()
     state = interp.get_state(env)
     max_length = len(env.snake)
     duration = 0
+    total_reward = 0.0
     # Anti-blocage : borne le nombre de pas sans manger pour eviter qu'un
     # modele en exploitation pure ne tourne en rond indefiniment.
     stall = 0
@@ -28,6 +36,13 @@ def run_session(env, interp, agent, learn, verbose, step_by_step,
             if display.should_quit():
                 break
         action = agent.choose_action(state)
+        if record is not None:
+            record.append({
+                "snake": [list(cell) for cell in env.snake],
+                "green_apples": [list(cell) for cell in env.green_apples],
+                "red_apples": [list(cell) for cell in env.red_apples],
+                "action": action,
+            })
         if verbose:
             print("Action:", constants.ACTION_NAMES[action])
             print()
@@ -45,6 +60,7 @@ def run_session(env, interp, agent, learn, verbose, step_by_step,
         dist_after = (interp.green_distance(env)
                       if event["type"] == "nothing" else None)
         reward += interp.approach_bonus(dist_before, dist_after, event["type"])
+        total_reward += reward
         stall = 0 if event["type"] == "green" else stall + 1
         done = env.is_game_over() or stall >= stall_limit
         next_state = None if done else interp.get_state(env)
@@ -58,7 +74,7 @@ def run_session(env, interp, agent, learn, verbose, step_by_step,
         if done:
             break
 
-    return max_length, duration
+    return max_length, duration, total_reward
 
 
 def _wait_step():
@@ -69,19 +85,32 @@ def _wait_step():
         pass
 
 
-def train(env, interp, agent, args, display=None):
-    """Enchaine les sessions d'entrainement et retourne (best_len, best_dur).
+def train(env, interp, agent, args, display=None, recorder=None):
+    """Enchaine les sessions d'entrainement.
+
+    Retourne (best_length, best_duration, lengths, durations) : les deux
+    premiers champs sont inchanges par rapport au comportement historique
+    (max sur toutes les sessions). Les deux derniers sont les listes brutes
+    par session, remplies uniquement si `args.benchmark` est vrai (sinon
+    listes vides) : elles permettent a l'appelant de calculer des stats
+    agregees (mode `-benchmark`) sans recalcul ni session supplementaire.
 
     Applique le decay d'epsilon apres chaque session (sauf en `-dontlearn`),
     imprime le bilan de chaque partie et s'arrete si l'affichage est ferme.
+    Si `recorder` (un `MetricsRecorder`) est fourni, chaque session lui est
+    signalee pour l'export CSV/plot ulterieur ; ce module ignore tout ce qui
+    concerne le format de sortie, laisse a `metrics.py`.
     """
     learn = not args.dontlearn
     verbose = args.visual == "on" or args.step_by_step
+    benchmark = getattr(args, "benchmark", False)
     best_length = 0
     best_duration = 0
+    lengths = []
+    durations = []
 
     for session in range(1, args.sessions + 1):
-        length, duration = run_session(
+        length, duration, total_reward = run_session(
             env, interp, agent,
             learn, verbose, args.step_by_step, display,
         )
@@ -89,9 +118,15 @@ def train(env, interp, agent, args, display=None):
             agent.decay_epsilon()
         best_length = max(best_length, length)
         best_duration = max(best_duration, duration)
+        if recorder is not None:
+            recorder.record(
+                session, length, duration, agent.epsilon, total_reward)
+        if benchmark:
+            lengths.append(length)
+            durations.append(duration)
         print("Session {}/{} - Game over, max length = {}, max duration = {}"
               .format(session, args.sessions, length, duration))
         if display is not None and display.should_quit():
             break
 
-    return best_length, best_duration
+    return best_length, best_duration, lengths, durations

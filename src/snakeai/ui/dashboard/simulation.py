@@ -114,7 +114,30 @@ class Simulation:
             return 0.0
         return sum(self.recent_lengths) / len(self.recent_lengths)
 
+    def survival_rate(self):
+        """Fraction des dernieres parties ayant grandi (0.0 si aucune).
+
+        Une partie compte comme "survie" si sa longueur maximale atteinte a
+        depasse la longueur de depart (SNAKE_START_LENGTH), c'est a dire
+        qu'elle a mange au moins une pomme verte nette avant de terminer.
+        Proxy simple, calcule sur la meme fenetre que `recent_lengths`.
+        """
+        if not self.recent_lengths:
+            return 0.0
+        threshold = constants.SNAKE_START_LENGTH + 1
+        grown = sum(1 for length in self.recent_lengths if length >= threshold)
+        return grown / len(self.recent_lengths)
+
     # -- Apprentissage / persistance --------------------------------------
+    def sync_epsilon(self):
+        """Resynchronise l'epsilon fige apres un chargement externe.
+
+        A appeler quand le modele de `agent` a ete remplace hors de cette
+        classe (ex : lobby de selection), pour que `toggle_learn` restaure
+        la bonne valeur au degel.
+        """
+        self._saved_epsilon = self.agent.epsilon
+
     def toggle_learn(self):
         """Gele/reactive l'apprentissage et retourne l'etat resultant."""
         if self.learn:

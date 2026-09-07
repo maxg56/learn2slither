@@ -12,6 +12,24 @@ from snakeai import constants
 class Interpreter:
     """Traduit le board en etat (vision) et en reward."""
 
+    def __init__(self, reward_mode="default"):
+        """Cree l'interpreter.
+
+        reward_mode : "default" (comportement historique, inchange) ou "alt"
+        (schema alternatif : anti demi-tour + bonus de survie, cf.
+        constants.py). "default" reste le comportement si non precise.
+        """
+        if reward_mode not in ("default", "alt"):
+            raise ValueError(
+                "reward_mode invalide : {!r} (attendu 'default' ou 'alt')"
+                .format(reward_mode))
+        self.reward_mode = reward_mode
+        # Direction du serpent et reference vers l'env, captures juste avant
+        # env.step() (cf. green_distance) pour detecter un demi-tour au
+        # prochain get_reward() : uniquement utilise en mode "alt".
+        self._prev_direction = None
+        self._env = None
+
     def _cell_char(self, env, cell):
         """Caractere d'affichage d'une case (hors tete)."""
         if cell in env.green_apples:
@@ -83,6 +101,12 @@ class Interpreter:
         """
         if not env.snake:
             return None
+        # Appele juste avant env.step() dans le trainer/dashboard : c'est le
+        # point d'entree ou l'on capture la direction "avant coup" et la
+        # reference de l'env, pour que get_reward() puisse ensuite detecter
+        # un demi-tour (mode "alt" uniquement, cf. _uturn_penalty).
+        self._prev_direction = env.direction
+        self._env = env
         best = None
         for action in constants.ACTIONS:
             ray = self._ray(env, action)
@@ -105,20 +129,55 @@ class Interpreter:
             return 0.0
         return constants.REWARD_APPROACH * (dist_before - dist_after)
 
+    @staticmethod
+    def _is_opposite(direction_a, direction_b):
+        """Vrai si deux directions sont exactement opposees."""
+        if direction_a is None or direction_b is None:
+            return False
+        dr_a, dc_a = constants.MOVES[direction_a]
+        dr_b, dc_b = constants.MOVES[direction_b]
+        return dr_a == -dr_b and dc_a == -dc_b
+
+    def _uturn_penalty(self):
+        """Penalite anti demi-tour (mode "alt" uniquement).
+
+        Compare la direction capturee juste avant env.step() (self._prev_
+        direction) a la direction courante de l'env juste apres (self._env.
+        direction a deja ete mise a jour par env.step() avec l'action
+        choisie). Se limite a la derniere action de l'agent : conforme a la
+        contrainte "vision seule" (cf. constants.REWARD_UTURN).
+        """
+        if self.reward_mode != "alt" or self._env is None:
+            return 0.0
+        if self._is_opposite(self._env.direction, self._prev_direction):
+            return constants.REWARD_UTURN
+        return 0.0
+
+    def _nothing_reward(self):
+        """Reward d'un pas "nothing" : ajoute le bonus de survie en "alt"."""
+        if self.reward_mode == "alt":
+            return constants.REWARD_NOTHING + constants.REWARD_SURVIVAL_BONUS
+        return constants.REWARD_NOTHING
+
     def get_reward(self, event):
         """Calcule la recompense associee a une transition de l'env."""
         kind = event["type"]
         if kind == "green":
-            return constants.REWARD_GREEN
-        if kind == "red":
+            reward = constants.REWARD_GREEN
+        elif kind == "red":
             # Une pomme rouge qui reduit le serpent a zero est une mort :
             # elle est penalisee comme un game over, pas comme un simple malus.
             if event.get("fatal"):
-                return constants.REWARD_GAMEOVER
-            return constants.REWARD_RED
-        if kind in ("wall", "collision", "gameover"):
-            return constants.REWARD_GAMEOVER
-        return constants.REWARD_NOTHING
+                reward = constants.REWARD_GAMEOVER
+            else:
+                reward = constants.REWARD_RED
+        elif kind in ("wall", "collision", "gameover"):
+            reward = constants.REWARD_GAMEOVER
+        else:
+            reward = self._nothing_reward()
+        if self.reward_mode == "alt":
+            reward += self._uturn_penalty()
+        return reward
 
     def render_vision(self, env):
         """Affiche la vision en croix (W/H/S/G/R/0) avant chaque action."""
