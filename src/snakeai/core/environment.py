@@ -17,6 +17,12 @@ class Environment:
     """Board carre et regles du Snake."""
 
     def __init__(self, size=constants.BOARD_SIZE):
+        if size < constants.SNAKE_START_LENGTH:
+            raise ValueError(
+                "size ({}) doit etre >= a la longueur initiale du serpent "
+                "({}), sinon aucun placement n'est possible."
+                .format(size, constants.SNAKE_START_LENGTH)
+            )
         self.size = size
         self.snake = []          # [(ligne, colonne), ...], tete en tete
         self.direction = None
