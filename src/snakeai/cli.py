@@ -6,12 +6,17 @@ et de deleguer soit au trainer, soit au dashboard.
 """
 
 import argparse
+import random
 import sys
 
+from snakeai import constants
 from snakeai.core import Environment
 from snakeai.learning import Agent, NNAgent
 from snakeai.perception import Interpreter
 from snakeai.training import train
+
+# Paliers de longueur du bonus "Records atteints" (cf. sujet 42).
+LENGTH_MILESTONES = (15, 20, 25, 30, 35)
 
 
 def parse_args(argv=None):
@@ -39,12 +44,28 @@ def parse_args(argv=None):
                         help="cote de la grille du dashboard (grid x grid)")
     parser.add_argument("-model", choices=["qtable", "nn"], default="qtable",
                         help="fonction Q utilisee : Q-table ou reseau NN")
+    parser.add_argument("-seed", type=int, default=None,
+                        help="graine aleatoire pour des runs reproductibles")
+    parser.add_argument("-board-size", dest="board_size", type=int,
+                        default=None,
+                        help="cote du board (defaut : constants.BOARD_SIZE)")
+    parser.add_argument("-benchmark", action="store_true",
+                        help="agrege longueur/duree de toutes les sessions")
+    parser.add_argument("-dashboard-lobby", dest="dashboard_lobby",
+                        action="store_true",
+                        help="affiche un lobby de choix de modele avant "
+                             "de lancer le dashboard (-dashboard requis)")
     return parser.parse_args(argv)
 
 
 def main():
     """Point d'entree du programme."""
     args = parse_args()
+    if args.seed is not None:
+        # Graine le module `random` global : utilise a la fois par
+        # Environment (placement serpent/pommes) et Agent (epsilon-greedy),
+        # donc suffisant pour rendre un run reproductible.
+        random.seed(args.seed)
 
     agent = _build_agent(args)
     learn = not args.dontlearn
@@ -55,13 +76,19 @@ def main():
         return
 
     display = _make_display(args.visual == "on")
-    env = Environment()
-    best_length, best_duration = train(env, interp, agent, args, display)
+    size = args.board_size if args.board_size is not None \
+        else constants.BOARD_SIZE
+    env = Environment(size=size)
+    best_length, best_duration, lengths, durations = train(
+        env, interp, agent, args, display)
     if display is not None:
         display.close()
 
     print("Game over, max length = {}, max duration = {}"
           .format(best_length, best_duration))
+    _print_records(best_length)
+    if args.benchmark:
+        _print_benchmark(lengths, durations)
     _save_model(agent, args.save)
 
 
@@ -90,12 +117,35 @@ def _save_model(agent, path):
               .format(path), file=sys.stderr)
 
 
+def _print_records(best_length):
+    """Affiche les paliers de longueur (15/20/25/30/35) atteints ou non."""
+    marks = " ".join(
+        "{} [{}]".format(
+            milestone, "OK" if best_length >= milestone else "--")
+        for milestone in LENGTH_MILESTONES
+    )
+    print("Records atteints : {}".format(marks))
+
+
+def _print_benchmark(lengths, durations):
+    """Affiche les stats agregees (mean/min/max) du mode `-benchmark`."""
+    if not lengths:
+        return
+    print("Benchmark ({} sessions) :".format(len(lengths)))
+    print("  Longueur - mean = {:.2f}, min = {}, max = {}"
+          .format(sum(lengths) / len(lengths), min(lengths), max(lengths)))
+    print("  Duree    - mean = {:.2f}, min = {}, max = {}"
+          .format(sum(durations) / len(durations), min(durations),
+                  max(durations)))
+
+
 def _run_dashboard(agent, interp, learn, args):
     """Lance la vue parallele puis sauvegarde le modele si demande."""
     try:
         from snakeai.ui.dashboard import Dashboard
         board = Dashboard(agent, interp, cols=args.grid, rows=args.grid,
-                          learn=learn, save_path=args.save)
+                          learn=learn, save_path=args.save,
+                          start_lobby=args.dashboard_lobby)
         board.run()
     except Exception as error:      # pragma: no cover - depend de l'env
         print("Avertissement : dashboard indisponible ({})".format(error),
