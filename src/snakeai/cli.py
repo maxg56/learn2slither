@@ -47,6 +47,9 @@ def parse_args(argv=None):
                         help="vue parallele : une grille de parties a la fois")
     parser.add_argument("-grid", type=int, default=6,
                         help="cote de la grille du dashboard (grid x grid)")
+    parser.add_argument("-export-gif", dest="export_gif", metavar="PATH",
+                        help="exporte la partie jouee en GIF anime "
+                             "(necessite -visual on)")
     parser.add_argument("-metrics", metavar="PATH",
                         help="export CSV des courbes d'entrainement")
     parser.add_argument("-plot", metavar="PATH",
@@ -97,7 +100,11 @@ def main():
         _run_dashboard(agent, interp, learn, args)
         return
 
-    display = _make_display(args.visual == "on")
+    if args.export_gif and args.visual != "on":
+        print("Avertissement : -export-gif necessite -visual on, "
+              "export ignore ({})".format(args.export_gif), file=sys.stderr)
+
+    display = _make_display(args.visual == "on", args.export_gif)
     size = args.board_size if args.board_size is not None \
         else constants.BOARD_SIZE
     env = Environment(size=size)
@@ -259,13 +266,13 @@ def _run_dashboard(agent, interp, learn, args):
     _save_model(agent, args.save)
 
 
-def _make_display(enabled):
+def _make_display(enabled, export_gif=None):
     """Cree l'affichage pygame si demande ; None sinon ou en cas d'echec."""
     if not enabled:
         return None
     try:
         from snakeai.ui.display import Display
-        return Display()
+        return Display(export_path=export_gif)
     except Exception as error:      # pragma: no cover - depend de l'env
         print("Avertissement : affichage graphique indisponible ({})"
               .format(error), file=sys.stderr)

@@ -5,9 +5,16 @@ mode pas a pas. La logique de jeu ne depend jamais de ce module : il est
 entierement desactivable via `-visual off`.
 """
 
+import sys
+
 import pygame
 
 from snakeai import constants
+
+# Nombre maximum de frames accumulees en memoire pour l'export GIF. Au-dela,
+# les frames excedentaires sont sous-echantillonnees (une frame sur N) afin
+# de garder une empreinte memoire raisonnable meme sur de longues parties.
+GIF_MAX_FRAMES = 600
 
 # Couleurs (R, V, B).
 COLOR_BG = (18, 18, 24)
@@ -21,11 +28,18 @@ COLOR_RED_APPLE = (210, 60, 60)
 class Display:
     """Rendu pygame du jeu."""
 
-    def __init__(self, size=constants.BOARD_SIZE, cell_pixels=40, fps=10):
+    def __init__(self, size=constants.BOARD_SIZE, cell_pixels=40, fps=10,
+                 export_path=None):
         self.size = size
         self.cell_pixels = cell_pixels
         self.fps = fps
         self.quit = False
+        # Export GIF (optionnel) : accumule les frames dessinees par
+        # render() en memoire, puis les assemble dans save_gif().
+        self.export_path = export_path
+        self._frames = []
+        self._frame_stride = 1
+        self._frame_tick = 0
         pygame.init()
         side = size * cell_pixels
         self.screen = pygame.display.set_mode((side, side))
@@ -67,7 +81,61 @@ class Display:
             hr, hc = env.snake[0]
             self._draw_cell(hr, hc, COLOR_HEAD)
         pygame.display.flip()
+        if self.export_path:
+            self._capture_frame()
         self.clock.tick(self.fps)
+
+    def _capture_frame(self):
+        """Ajoute la frame courante au buffer d'export, avec sous-
+        echantillonnage automatique si le nombre de frames devient trop
+        grand (parties/sessions longues)."""
+        self._frame_tick += 1
+        if (self._frame_tick - 1) % self._frame_stride != 0:
+            return
+        frame = pygame.surfarray.array3d(self.screen).copy()
+        self._frames.append(frame)
+        if len(self._frames) >= GIF_MAX_FRAMES:
+            self._frames = self._frames[::2]
+            self._frame_stride *= 2
+
+    def save_gif(self):
+        """Assemble les frames accumulees en GIF anime a `export_path`.
+
+        Ne fait rien si aucun export n'est demande ou si aucune frame n'a
+        ete capturee. Ne crashe jamais : affiche un avertissement clair
+        sur stderr si Pillow est absent ou si l'ecriture echoue.
+        """
+        if not self.export_path:
+            return
+        if not self._frames:
+            print("Avertissement : aucune frame capturee, export GIF "
+                  "annule ({})".format(self.export_path), file=sys.stderr)
+            return
+        try:
+            from PIL import Image
+        except ImportError:
+            print("Avertissement : Pillow n'est pas installe, export GIF "
+                  "ignore (pip install pillow) ; cible = {}"
+                  .format(self.export_path), file=sys.stderr)
+            return
+        try:
+            duration_ms = max(1000 // self.fps, 20)
+            images = [
+                Image.fromarray(frame.transpose(1, 0, 2), "RGB")
+                for frame in self._frames
+            ]
+            images[0].save(
+                self.export_path,
+                save_all=True,
+                append_images=images[1:],
+                duration=duration_ms,
+                loop=0,
+            )
+            print("GIF exporte dans {} ({} frames)"
+                  .format(self.export_path, len(images)))
+        except Exception as error:      # pragma: no cover - depend de l'env
+            print("Avertissement : echec de l'export GIF dans {} ({})"
+                  .format(self.export_path, error), file=sys.stderr)
 
     def wait_step(self):
         """Bloque jusqu'a la touche suivante en mode pas a pas."""
@@ -88,5 +156,6 @@ class Display:
         return self.quit
 
     def close(self):
-        """Ferme la fenetre graphique proprement."""
+        """Ferme la fenetre graphique proprement (et exporte le GIF)."""
+        self.save_gif()
         pygame.quit()
