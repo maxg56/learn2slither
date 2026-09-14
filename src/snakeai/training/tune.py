@@ -47,10 +47,16 @@ def _train_quietly(env, interp, agent, sessions):
     durations = []
     single_session = argparse.Namespace(
         sessions=1, visual="off", dontlearn=False, step_by_step=False,
+        benchmark=False,
     )
     with contextlib.redirect_stdout(io.StringIO()):
         for _ in range(sessions):
-            length, duration = train(env, interp, agent, single_session)
+            # train() renvoie 4 champs : les deux listes finales ne sont
+            # remplies qu'en mode -benchmark, inutiles ici (une session par
+            # appel, donc best_length/best_duration sont deja les valeurs
+            # de la session).
+            length, duration, _, _ = train(
+                env, interp, agent, single_session)
             lengths.append(length)
             durations.append(duration)
     return lengths, durations
