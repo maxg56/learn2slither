@@ -10,6 +10,7 @@ import os
 import random
 import sys
 import tempfile
+import traceback
 
 from snakeai import constants
 from snakeai.core import Environment
@@ -319,18 +320,37 @@ def _print_benchmark(lengths, durations):
 
 
 def _run_dashboard(agent, interp, learn, args, size):
-    """Lance la vue parallele puis sauvegarde le modele si demande."""
+    """Lance la vue parallele puis sauvegarde le modele si demande.
+
+    Les trois etapes ont des modes d'echec distincts et ne sont donc pas
+    gardees par le meme `except` (issue #34) : pygame absent (ImportError),
+    fenetre impossible a ouvrir (`pygame.error`), et bug interne du
+    dashboard. Ce dernier n'est plus requalifie en "dashboard
+    indisponible" : on affiche le traceback complet sur stderr, puis on
+    termine quand meme le bilan pour ne pas perdre l'apprentissage.
+    """
     try:
+        import pygame
         from snakeai.ui.dashboard import Dashboard
+    except ImportError as error:
+        print("Avertissement : dashboard indisponible ({})".format(error),
+              file=sys.stderr)
+        return
+    try:
         board = Dashboard(agent, interp, cols=args.grid, rows=args.grid,
                           board_size=size,
                           learn=learn, save_path=args.save,
                           start_lobby=args.dashboard_lobby)
-        board.run()
-    except Exception as error:      # pragma: no cover - depend de l'env
+    except pygame.error as error:
         print("Avertissement : dashboard indisponible ({})".format(error),
               file=sys.stderr)
         return
+    try:
+        board.run()
+    except Exception:
+        print("Erreur interne du dashboard, arret de la vue parallele :",
+              file=sys.stderr)
+        traceback.print_exc()
     print("Game over, max length = {}, max duration = {}"
           .format(board.best_length, board.best_duration))
     _save_model(agent, args.save)
@@ -341,11 +361,17 @@ def _make_display(enabled, export_gif=None, size=None):
     if not enabled:
         return None
     try:
+        import pygame
         from snakeai.ui.display import Display
-        if size is None:
-            size = constants.BOARD_SIZE
+    except ImportError as error:
+        print("Avertissement : affichage graphique indisponible ({})"
+              .format(error), file=sys.stderr)
+        return None
+    if size is None:
+        size = constants.BOARD_SIZE
+    try:
         return Display(size=size, export_path=export_gif)
-    except Exception as error:      # pragma: no cover - depend de l'env
+    except pygame.error as error:
         print("Avertissement : affichage graphique indisponible ({})"
               .format(error), file=sys.stderr)
         return None
