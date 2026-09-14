@@ -13,7 +13,7 @@ import tempfile
 
 from snakeai import constants
 from snakeai.core import Environment
-from snakeai.learning import Agent, NNAgent
+from snakeai.learning import Agent
 from snakeai.perception import Interpreter
 from snakeai.training import MetricsRecorder, plot as plot_metrics
 from snakeai.training import run_session, train
@@ -149,7 +149,12 @@ def main():
 
 def _build_agent(args):
     """Cree l'agent, charge un modele et applique le mode -dontlearn."""
-    agent = NNAgent() if args.model == "nn" else Agent()
+    if args.model == "nn":
+        # Import paresseux : numpy n'est requis que pour le reseau de neurones.
+        from snakeai.learning import NNAgent
+        agent = NNAgent()
+    else:
+        agent = Agent()
     if args.load:
         if agent.load(args.load):
             print("Modele charge depuis {}".format(args.load))
