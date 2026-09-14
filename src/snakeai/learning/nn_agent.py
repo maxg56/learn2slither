@@ -119,19 +119,52 @@ class NNAgent:
     def load(self, path):
         """Recharge un etat d'apprentissage depuis un fichier JSON.
 
-        Tolerant aux fichiers absents ou corrompus (jamais de crash).
-        Retourne True si le chargement a reussi, False sinon.
+        Tolerant aux fichiers absents ou corrompus (jamais de crash), y
+        compris un JSON syntaxiquement valide mais de forme incorrecte
+        (poids aux mauvaises dimensions, hyperparametres non numeriques) :
+        sans ce controle, un tel modele etait accepte puis faisait planter
+        le premier forward. La validation se fait sur des variables
+        locales : en cas d'echec, l'etat actuel de l'agent n'est jamais
+        modifie. Retourne True si le chargement a reussi, False sinon.
         """
         try:
             with open(path, "r") as handle:
                 data = json.load(handle)
-            self.alpha = data.get("alpha", self.alpha)
-            self.gamma = data.get("gamma", self.gamma)
-            self.epsilon = data.get("epsilon", self.epsilon)
-            self.w1 = np.array(data["w1"], dtype=np.float64)
-            self.b1 = np.array(data["b1"], dtype=np.float64)
-            self.w2 = np.array(data["w2"], dtype=np.float64)
-            self.b2 = np.array(data["b2"], dtype=np.float64)
+            alpha = data.get("alpha", self.alpha)
+            gamma = data.get("gamma", self.gamma)
+            epsilon = data.get("epsilon", self.epsilon)
+            if not all(isinstance(v, (int, float))
+                       for v in (alpha, gamma, epsilon)):
+                return False
+            w1 = _as_array(data["w1"], (INPUT_SIZE, HIDDEN_UNITS))
+            b1 = _as_array(data["b1"], (HIDDEN_UNITS,))
+            w2 = _as_array(data["w2"], (HIDDEN_UNITS, OUTPUT_SIZE))
+            b2 = _as_array(data["b2"], (OUTPUT_SIZE,))
+            if any(array is None for array in (w1, b1, w2, b2)):
+                return False
+            self.alpha = alpha
+            self.gamma = gamma
+            self.epsilon = epsilon
+            self.w1 = w1
+            self.b1 = b1
+            self.w2 = w2
+            self.b2 = b2
             return True
         except (OSError, ValueError, KeyError, TypeError):
             return False
+
+
+def _as_array(values, shape):
+    """Convertit `values` en tableau flottant de forme `shape`, sinon None.
+
+    Retourne None (plutot que de lever) des que la conversion echoue ou que
+    la forme ne correspond pas, pour que `load()` puisse refuser le fichier
+    sans avoir touche a l'etat de l'agent.
+    """
+    try:
+        array = np.array(values, dtype=np.float64)
+    except (ValueError, TypeError):
+        return None
+    if array.shape != shape or not np.isfinite(array).all():
+        return None
+    return array
