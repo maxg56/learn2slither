@@ -146,7 +146,6 @@ def main():
         display.close()
 
 
-
 def _report_run(agent, args, recorder,
                 best_length, best_duration, lengths, durations):
     """Bilan commun aux deux branches (train / -record).
@@ -164,13 +163,13 @@ def _report_run(agent, args, recorder,
         _print_benchmark(lengths, durations)
     _save_model(agent, args.save)
     _export_metrics(recorder, args.metrics, args.plot)
-    
+
+
 def _board_size(args):
     """Cote du board demande, ou la valeur par defaut du projet."""
     if args.board_size is not None:
         return args.board_size
     return constants.BOARD_SIZE
-  
 
 
 def _build_agent(args):
@@ -282,9 +281,11 @@ def _run_recorded_session(env, interp, agent, learn, args, display,
 def _run_replay(args):
     """Rejoue un enregistrement -record : pure lecture, sans agent ni RNG."""
     display = _make_display(args.visual == "on")
+    verbose = args.visual == "on" or args.step_by_step
     try:
         played = replay_recording(args.replay, display=display,
-                                  step_by_step=args.step_by_step)
+                                  step_by_step=args.step_by_step,
+                                  verbose=verbose)
     except RecordingError as error:
         print("Avertissement : replay impossible depuis {} ({})"
               .format(args.replay, error), file=sys.stderr)
