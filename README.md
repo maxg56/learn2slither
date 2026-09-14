@@ -13,7 +13,7 @@ Le projet est packagé avec [uv](https://docs.astral.sh/uv/) et cible Python
 qui télécharge lui-même l'interpréteur Python requis si besoin :
 
 ```bash
-# Installer les dépendances (numpy, pygame-ce, flake8) dans .venv
+# Installer les dépendances (numpy, pygame-ce, flake8, pytest) dans .venv
 uv sync
 ```
 
@@ -51,6 +51,16 @@ Flags disponibles :
 
 À la fin de chaque exécution, le programme affiche
 `Game over, max length = X, max duration = Y`.
+
+## Développement
+
+```bash
+uv run flake8 .        # norme (obligatoire, le sujet impose flake8 sans erreur)
+uv run pytest tests    # suite de tests
+```
+
+Les deux commandes tournent aussi en CI (GitHub Actions) sur chaque push et
+pull request.
 
 ## Modèles livrés
 

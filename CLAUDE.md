@@ -78,10 +78,13 @@ En fin de session, afficher : `Game over, max length = X, max duration = Y`.
 ```bash
 # Environnement virtuel
 python3 -m venv venv && source venv/bin/activate
-pip install -r requirements.txt   # pygame, numpy, flake8
+pip install -r requirements.txt   # pygame, numpy, flake8, pytest
 
 # Lint (obligatoire avant tout commit)
 flake8 .
+
+# Tests (obligatoire avant tout commit, comme le lint)
+uv run pytest tests
 
 # Entraînement des modèles à livrer
 ./snake -sessions 1 -save models/1sess.txt -visual off
