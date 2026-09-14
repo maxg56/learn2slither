@@ -104,7 +104,8 @@ def _wait_step(display):
         pass
 
 
-def replay(path, display=None, step_by_step=False, pause=REPLAY_PAUSE_SECONDS):
+def replay(path, display=None, step_by_step=False, verbose=True,
+           pause=REPLAY_PAUSE_SECONDS):
     """Rejoue un enregistrement frame par frame, sans agent ni RNG.
 
     Reconstruit a chaque frame un `Environment` jetable dont le serpent et
@@ -112,6 +113,10 @@ def replay(path, display=None, step_by_step=False, pause=REPLAY_PAUSE_SECONDS):
     principe que dans `tests/test_red_apple_fatal.py`), puis reutilise le
     rendu terminal existant (`Interpreter.render_vision`) et, si demande,
     l'affichage pygame (`Display.render` / `Display.wait_step`).
+
+    `verbose` gouverne l'affichage terminal par pas (vision + action), comme
+    dans `run_session` : `-visual off` doit supprimer tout l'affichage par
+    pas, pas seulement la fenetre pygame (contrainte 3 du sujet).
 
     Retourne le nombre de frames rejouees.
     """
@@ -130,13 +135,15 @@ def replay(path, display=None, step_by_step=False, pause=REPLAY_PAUSE_SECONDS):
         env.red_apples = frame["red_apples"]
         env.done = False
 
-        print(interp.render_vision(env))
+        if verbose:
+            print(interp.render_vision(env))
         if display is not None:
             display.render(env)
             if display.should_quit():
                 break
-        print("Action:", constants.ACTION_NAMES[frame["action"]])
-        print()
+        if verbose:
+            print("Action:", constants.ACTION_NAMES[frame["action"]])
+            print()
         played += 1
 
         if step_by_step:
