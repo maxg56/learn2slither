@@ -99,6 +99,55 @@ def test_get_reward_nothing():
     assert interp.get_reward({"type": "nothing"}) == constants.REWARD_NOTHING
 
 
+# -- get_reward() mode "alt" : demi-tour explicite ----------------------
+
+def test_alt_uturn_penalty_from_explicit_directions():
+    interp = Interpreter(reward_mode="alt")
+    base = constants.REWARD_NOTHING + constants.REWARD_SURVIVAL_BONUS
+    event = {"type": "nothing"}
+
+    assert interp.get_reward(event, constants.UP, constants.DOWN) == \
+        base + constants.REWARD_UTURN
+    assert interp.get_reward(event, constants.UP, constants.LEFT) == base
+    assert interp.get_reward(event, constants.UP, constants.UP) == base
+
+
+def test_alt_no_uturn_penalty_without_directions():
+    interp = Interpreter(reward_mode="alt")
+    base = constants.REWARD_NOTHING + constants.REWARD_SURVIVAL_BONUS
+
+    assert interp.get_reward({"type": "nothing"}) == base
+    assert interp.get_reward({"type": "nothing"}, None, constants.UP) == base
+    assert interp.get_reward({"type": "nothing"}, constants.UP, None) == base
+
+
+def test_default_mode_ignores_uturn():
+    interp = Interpreter()
+    event = {"type": "nothing"}
+    assert interp.get_reward(event, constants.UP, constants.DOWN) == \
+        constants.REWARD_NOTHING
+
+
+def test_interpreter_is_stateless_across_envs():
+    """Une seule instance partagee par plusieurs envs (dashboard) : le
+    reward d'un board ne depend jamais de ce qui a ete calcule sur un
+    autre, ni de l'ordre des appels a green_distance()."""
+    interp = Interpreter(reward_mode="alt")
+    base = constants.REWARD_NOTHING + constants.REWARD_SURVIVAL_BONUS
+
+    env_a = Environment()
+    env_b = Environment()
+    interp.green_distance(env_a)
+    interp.green_distance(env_b)
+    assert not hasattr(interp, "_env")
+    assert not hasattr(interp, "_prev_direction")
+
+    # Peu importe les appels precedents, seul l'argument compte.
+    reward = interp.get_reward({"type": "nothing"},
+                               constants.LEFT, constants.RIGHT)
+    assert reward == base + constants.REWARD_UTURN
+
+
 # -- green_distance() ----------------------------------------------------
 
 def test_green_distance_returns_nearest_visible_apple():
@@ -169,6 +218,10 @@ if __name__ == "__main__":
     test_get_reward_red_fatal()
     test_get_reward_wall_collision_gameover()
     test_get_reward_nothing()
+    test_alt_uturn_penalty_from_explicit_directions()
+    test_alt_no_uturn_penalty_without_directions()
+    test_default_mode_ignores_uturn()
+    test_interpreter_is_stateless_across_envs()
     test_green_distance_returns_nearest_visible_apple()
     test_green_distance_none_when_no_green_visible()
     test_green_distance_none_when_snake_empty()

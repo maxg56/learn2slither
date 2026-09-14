@@ -24,11 +24,6 @@ class Interpreter:
                 "reward_mode invalide : {!r} (attendu 'default' ou 'alt')"
                 .format(reward_mode))
         self.reward_mode = reward_mode
-        # Direction du serpent et reference vers l'env, captures juste avant
-        # env.step() (cf. green_distance) pour detecter un demi-tour au
-        # prochain get_reward() : uniquement utilise en mode "alt".
-        self._prev_direction = None
-        self._env = None
 
     def _cell_char(self, env, cell):
         """Caractere d'affichage d'une case (hors tete)."""
@@ -101,12 +96,6 @@ class Interpreter:
         """
         if not env.snake:
             return None
-        # Appele juste avant env.step() dans le trainer/dashboard : c'est le
-        # point d'entree ou l'on capture la direction "avant coup" et la
-        # reference de l'env, pour que get_reward() puisse ensuite detecter
-        # un demi-tour (mode "alt" uniquement, cf. _uturn_penalty).
-        self._prev_direction = env.direction
-        self._env = env
         best = None
         for action in constants.ACTIONS:
             ray = self._ray(env, action)
@@ -138,18 +127,18 @@ class Interpreter:
         dr_b, dc_b = constants.MOVES[direction_b]
         return dr_a == -dr_b and dc_a == -dc_b
 
-    def _uturn_penalty(self):
+    def _uturn_penalty(self, prev_direction, action):
         """Penalite anti demi-tour (mode "alt" uniquement).
 
-        Compare la direction capturee juste avant env.step() (self._prev_
-        direction) a la direction courante de l'env juste apres (self._env.
-        direction a deja ete mise a jour par env.step() avec l'action
-        choisie). Se limite a la derniere action de l'agent : conforme a la
-        contrainte "vision seule" (cf. constants.REWARD_UTURN).
+        Compare la direction du serpent avant le pas (prev_direction) a
+        l'action choisie par l'agent. Se limite a la derniere action de
+        l'agent : conforme a la contrainte "vision seule" (cf.
+        constants.REWARD_UTURN). Sans les deux directions (None), aucune
+        penalite n'est appliquee.
         """
-        if self.reward_mode != "alt" or self._env is None:
+        if self.reward_mode != "alt":
             return 0.0
-        if self._is_opposite(self._env.direction, self._prev_direction):
+        if self._is_opposite(action, prev_direction):
             return constants.REWARD_UTURN
         return 0.0
 
@@ -159,8 +148,15 @@ class Interpreter:
             return constants.REWARD_NOTHING + constants.REWARD_SURVIVAL_BONUS
         return constants.REWARD_NOTHING
 
-    def get_reward(self, event):
-        """Calcule la recompense associee a une transition de l'env."""
+    def get_reward(self, event, prev_direction=None, action=None):
+        """Calcule la recompense associee a une transition de l'env.
+
+        prev_direction : direction du serpent AVANT env.step() (env.direction
+        lue par l'appelant avant le pas) ; action : action appliquee par ce
+        pas. Les deux ne servent qu'a la penalite anti demi-tour du mode
+        "alt" : l'interpreter ne garde aucun etat entre deux appels, il est
+        donc partageable entre plusieurs environnements.
+        """
         kind = event["type"]
         if kind == "green":
             reward = constants.REWARD_GREEN
@@ -175,8 +171,7 @@ class Interpreter:
             reward = constants.REWARD_GAMEOVER
         else:
             reward = self._nothing_reward()
-        if self.reward_mode == "alt":
-            reward += self._uturn_penalty()
+        reward += self._uturn_penalty(prev_direction, action)
         return reward
 
     def render_vision(self, env):

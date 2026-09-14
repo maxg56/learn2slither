@@ -53,8 +53,9 @@ def run_session(env, interp, agent, learn, verbose, step_by_step,
                 _wait_step()
 
         dist_before = interp.green_distance(env)
+        prev_direction = env.direction
         event = env.step(action)
-        reward = interp.get_reward(event)
+        reward = interp.get_reward(event, prev_direction, action)
         # dist_after n'a de sens que sur un deplacement simple : apres avoir
         # mange/perdu, le serpent peut etre vide ou la pomme a bouge.
         dist_after = (interp.green_distance(env)
