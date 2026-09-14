@@ -88,8 +88,9 @@ def _validate_args(parser, args):
 
     Sans ce garde-fou, `-board-size 1` remonte la ValueError brute
     d'`Environment` et `-grid 0` construit un dashboard sans aucune
-    partie : deux tracebacks pour l'utilisateur. `parser.error()` affiche
-    un message propre et sort avec le code 2.
+    partie : deux tracebacks pour l'utilisateur. `-sessions 0` (issue #57)
+    ne crashait pas mais annoncait un bilan a zero sans jouer. `parser.error()`
+    affiche un message propre et sort avec le code 2.
     """
     if args.board_size is not None \
             and args.board_size < constants.SNAKE_START_LENGTH:
@@ -99,6 +100,9 @@ def _validate_args(parser, args):
     if args.grid < 1:
         parser.error(
             "-grid doit etre >= 1, recu {}".format(args.grid))
+    if args.sessions < 1:
+        parser.error(
+            "-sessions doit etre >= 1, recu {}".format(args.sessions))
 
 
 def main():
