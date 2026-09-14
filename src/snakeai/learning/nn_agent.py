@@ -23,11 +23,14 @@ class NNAgent:
     """Agent Q-learning dont la fonction Q est un petit reseau de neurones."""
 
     def __init__(self, alpha=constants.ALPHA, gamma=constants.GAMMA,
-                 epsilon=constants.EPSILON_START):
+                 epsilon=constants.EPSILON_START, seed=None):
         self.alpha = alpha
         self.gamma = gamma
         self.epsilon = epsilon
-        rng = np.random.default_rng()
+        # `seed` graine le generateur local plutot que l'etat global numpy :
+        # sans lui, l'initialisation des poids reste aleatoire et `-seed`
+        # ne suffit pas a rendre un run `-model nn` reproductible.
+        rng = np.random.default_rng(seed)
         # Initialisation "petite" pour eviter de saturer tanh des le depart.
         self.w1 = rng.normal(0, 0.1, (INPUT_SIZE, HIDDEN_UNITS))
         self.b1 = np.zeros(HIDDEN_UNITS)
