@@ -118,6 +118,10 @@ def replay(path, display=None, step_by_step=False, pause=REPLAY_PAUSE_SECONDS):
     frames, size = load_recording(path)
     interp = Interpreter()
     env = Environment(size=size)
+    if display is not None:
+        # L'affichage est cree avant la lecture du fichier : il faut
+        # l'ajuster a la taille de board reellement enregistree.
+        display.resize(size)
 
     played = 0
     for frame in frames:
