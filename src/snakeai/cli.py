@@ -76,7 +76,27 @@ def parse_args(argv=None):
                         action="store_true",
                         help="affiche un lobby de choix de modele avant "
                              "de lancer le dashboard (-dashboard requis)")
-    return parser.parse_args(argv)
+    args = parser.parse_args(argv)
+    _validate_args(parser, args)
+    return args
+
+
+def _validate_args(parser, args):
+    """Rejette les bornes invalides via `parser.error()`.
+
+    Sans ce garde-fou, `-board-size 1` remonte la ValueError brute
+    d'`Environment` et `-grid 0` construit un dashboard sans aucune
+    partie : deux tracebacks pour l'utilisateur. `parser.error()` affiche
+    un message propre et sort avec le code 2.
+    """
+    if args.board_size is not None \
+            and args.board_size < constants.SNAKE_START_LENGTH:
+        parser.error(
+            "-board-size doit etre >= {} (longueur initiale du serpent), "
+            "recu {}".format(constants.SNAKE_START_LENGTH, args.board_size))
+    if args.grid < 1:
+        parser.error(
+            "-grid doit etre >= 1, recu {}".format(args.grid))
 
 
 def main():
