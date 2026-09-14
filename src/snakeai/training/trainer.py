@@ -63,8 +63,13 @@ def run_session(env, interp, agent, learn, verbose, step_by_step,
         reward += interp.approach_bonus(dist_before, dist_after, event["type"])
         total_reward += reward
         stall = 0 if event["type"] == "green" else stall + 1
-        done = env.is_game_over() or stall >= stall_limit
-        next_state = None if done else interp.get_state(env)
+        # "Fin d'episode" != "etat terminal" : la coupure anti-blocage
+        # (truncation) arrete la partie sur un etat parfaitement viable, il
+        # faut donc bootstrapper dessus au lieu de le traiter comme un
+        # game over, sinon on apprend une valeur nulle qui est fausse.
+        terminal = env.is_game_over()
+        truncated = stall >= stall_limit
+        next_state = None if terminal else interp.get_state(env)
         if learn:
             agent.update(state, action, reward, next_state)
         if next_state is not None:
@@ -72,7 +77,7 @@ def run_session(env, interp, agent, learn, verbose, step_by_step,
 
         duration += 1
         max_length = max(max_length, len(env.snake))
-        if done:
+        if terminal or truncated:
             break
 
     return max_length, duration, total_reward

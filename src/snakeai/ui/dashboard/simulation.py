@@ -64,7 +64,7 @@ class Simulation:
                       if event["type"] == "nothing" else None)
         reward += self.interp.approach_bonus(
             dist_before, dist_after, event["type"])
-        done = env.is_game_over()
+        terminal = env.is_game_over()
 
         # Anti-blocage : on remet le compteur a zero quand le serpent mange,
         # sinon on force la fin de partie s'il tourne en rond trop longtemps.
@@ -72,10 +72,12 @@ class Simulation:
             self.stall[i] = 0
         else:
             self.stall[i] += 1
-        if not done and self.stall[i] >= self.stall_limit:
-            done = True
+        # Cette coupure est une troncature, pas un etat terminal : la partie
+        # s'arrete sur un etat viable, donc on bootstrappe dessus au lieu de
+        # lui apprendre une valeur nulle.
+        truncated = self.stall[i] >= self.stall_limit
 
-        next_state = None if done else self.interp.get_state(env)
+        next_state = None if terminal else self.interp.get_state(env)
         if self.learn:
             self.agent.update(state, action, reward, next_state)
 
@@ -84,7 +86,7 @@ class Simulation:
         self.cur_max_len[i] = max(self.cur_max_len[i], length)
         self.best_length = max(self.best_length, length)
 
-        if done:
+        if terminal or truncated:
             self._end_episode(i)
         else:
             self.states[i] = next_state
