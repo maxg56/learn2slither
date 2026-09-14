@@ -10,7 +10,11 @@ jamais corrompre l'etat de l'agent en cas d'echec.
 import os
 import tempfile
 
+from snakeai import constants
 from snakeai.learning import Agent
+
+# Cle JSON d'un etat tout a zero, telle que serialisee par Agent.save().
+ZERO_STATE = str((0,) * constants.STATE_SIZE)
 
 
 def _tmp_path():
@@ -25,8 +29,8 @@ def _agent_with_state():
     """Agent avec une q_table connue, non vide, servant d'etat de reference."""
     agent = Agent(alpha=0.1, gamma=0.9, epsilon=0.5)
     agent.q_table = {
-        (0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0): [1.0, 2.0, 3.0, 4.0],
-        (1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0): [-1.0, 0.5, 0.0, 9.0],
+        (0,) * constants.STATE_SIZE: [1.0, 2.0, 3.0, 4.0],
+        (1, 0) * (constants.STATE_SIZE // 2): [-1.0, 0.5, 0.0, 9.0],
     }
     return agent
 
@@ -65,7 +69,7 @@ def test_load_q_table_value_wrong_type_returns_false_and_keeps_state():
         with open(path, "w") as handle:
             handle.write(
                 '{"alpha": 0.1, "gamma": 0.9, "epsilon": 1.0, '
-                '"q_table": {"(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)": '
+                '"q_table": {"' + ZERO_STATE + '": '
                 '"abcd"}}'
             )
 
@@ -85,7 +89,7 @@ def test_load_q_table_value_wrong_length_returns_false_and_keeps_state():
         with open(path, "w") as handle:
             handle.write(
                 '{"alpha": 0.1, "gamma": 0.9, "epsilon": 1.0, '
-                '"q_table": {"(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)": '
+                '"q_table": {"' + ZERO_STATE + '": '
                 '[1.0, 2.0]}}'
             )
 

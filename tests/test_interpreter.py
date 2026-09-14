@@ -36,14 +36,14 @@ def test_get_vision_one_ray_per_action_ending_in_wall():
 
 # -- get_state() --------------------------------------------------------
 
-def test_get_state_returns_12_binary_features():
+def test_get_state_returns_state_size_binary_features():
     env = Environment()
     interp = Interpreter()
 
     state = interp.get_state(env)
 
     assert isinstance(state, tuple)
-    assert len(state) == 12
+    assert len(state) == constants.STATE_SIZE == 16
     assert all(v in (0, 1) for v in state)
 
 
@@ -51,23 +51,41 @@ def test_get_state_reflects_danger_green_red_bits():
     env = _bare_env()
     env.snake = [(5, 5), (5, 4), (5, 3)]
     env.direction = constants.RIGHT
-    # Danger immediat en haut (corps juste au dessus impossible ici, donc
-    # on force une pomme rouge adjacente + une pomme verte visible ailleurs).
     env.green_apples = [(5, 7)]     # visible a droite, non adjacente
-    env.red_apples = [(4, 5)]       # visible en haut, non adjacente
+    env.red_apples = [(3, 5)]       # visible en haut, non adjacente
     interp = Interpreter()
 
     state = interp.get_state(env)
 
-    up_danger, up_green, up_red = state[0:3]
-    right_danger, right_green, right_red = state[9:12]
+    up_danger, up_green, up_red, up_red_adj = state[0:4]
+    right_danger, right_green, right_red, right_red_adj = state[12:16]
 
     assert up_red == 1
+    assert up_red_adj == 0
     assert up_green == 0
     assert right_green == 1
     assert right_red == 0
+    assert right_red_adj == 0
     assert up_danger == 0
     assert right_danger == 0
+
+
+def test_get_state_red_adjacent_bit_distinguishes_glued_red_apple():
+    """Regression #33 : une rouge collee a la tete doit etre distinguable
+    d'une rouge lointaine sur le meme rayon (piege mortel a longueur 1)."""
+    env = _bare_env()
+    env.snake = [(5, 5), (5, 4), (5, 3)]
+    env.direction = constants.RIGHT
+    env.green_apples = []
+    interp = Interpreter()
+
+    env.red_apples = [(4, 5)]       # collee en haut
+    up_danger, _, up_red, up_red_adj = interp.get_state(env)[0:4]
+    assert (up_danger, up_red, up_red_adj) == (0, 1, 1)
+
+    env.red_apples = [(1, 5)]       # meme rayon, loin
+    up_danger, _, up_red, up_red_adj = interp.get_state(env)[0:4]
+    assert (up_danger, up_red, up_red_adj) == (0, 1, 0)
 
 
 # -- get_reward() -------------------------------------------------------
@@ -211,7 +229,7 @@ def test_approach_bonus_zero_when_distance_missing():
 
 if __name__ == "__main__":
     test_get_vision_one_ray_per_action_ending_in_wall()
-    test_get_state_returns_12_binary_features()
+    test_get_state_returns_state_size_binary_features()
     test_get_state_reflects_danger_green_red_bits()
     test_get_reward_green()
     test_get_reward_red_non_fatal()

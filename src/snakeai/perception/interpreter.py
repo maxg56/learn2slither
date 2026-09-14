@@ -72,10 +72,13 @@ class Interpreter:
         """Reduit la vision en une cle hashable pour la Q-table.
 
         Par direction : danger adjacent (mur ou corps), pomme verte visible,
-        pomme rouge visible. Etat = tuple de 12 bits, independant de la taille
-        du board. Le gradient vers la nourriture est fourni par le reward
-        shaping (approach_bonus), pas par l'etat : coder la distance ici
-        multiplie l'espace d'etats sans gain de perf mesurable.
+        pomme rouge visible, pomme rouge adjacente. Etat = tuple de
+        constants.STATE_SIZE bits (16), independant de la taille du board.
+        Le bit "rouge adjacente" rend visible le piege d'une rouge collee a
+        la tete (mortelle a longueur 1) sans encoder de distance. Le gradient
+        vers la nourriture est fourni par le reward shaping (approach_bonus),
+        pas par l'etat : coder la distance ici multiplie l'espace d'etats
+        sans gain de perf mesurable.
         """
         features = []
         for action in constants.ACTIONS:
@@ -84,7 +87,8 @@ class Interpreter:
                                     constants.CELL_BODY))
             green = int(constants.CELL_GREEN in ray)
             red = int(constants.CELL_RED in ray)
-            features.extend((danger, green, red))
+            red_adjacent = int(ray[0] == constants.CELL_RED)
+            features.extend((danger, green, red, red_adjacent))
         return tuple(features)
 
     def green_distance(self, env):
