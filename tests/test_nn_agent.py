@@ -160,3 +160,34 @@ if __name__ == "__main__":
     test_update_handles_terminal_transition()
     test_load_missing_file_returns_false()
     print("OK - tests NNAgent (hors roundtrip qui necessite tmp_path)")
+
+
+def test_epsilon_decay_is_configurable_and_persisted(tmp_path):
+    """Regression (#35) : NNAgent ignorait `epsilon_decay`.
+
+    Le decay etait lu en dur dans constants et absent de save/load : un
+    NNAgent n'etait pas substituable a Agent (tune.py ne pouvait pas le
+    balayer) et un aller-retour save/load perdait le reglage.
+    """
+    agent = NNAgent(epsilon=1.0, epsilon_decay=0.5)
+    agent.decay_epsilon()
+    assert agent.epsilon == 0.5
+
+    path = str(tmp_path / "nn_model.json")
+    assert agent.save(path) is True
+    with open(path) as handle:
+        assert json.load(handle)["epsilon_decay"] == 0.5
+
+    reloaded = NNAgent()
+    assert reloaded.load(path) is True
+    assert reloaded.epsilon_decay == 0.5
+
+
+def test_load_rejects_non_numeric_epsilon_decay(tmp_path):
+    payload = _valid_payload()
+    payload["epsilon_decay"] = "vite"
+    path = tmp_path / "nn_model.json"
+    path.write_text(json.dumps(payload))
+    agent = NNAgent()
+    assert agent.load(str(path)) is False
+    assert agent.epsilon_decay == constants.EPSILON_DECAY
