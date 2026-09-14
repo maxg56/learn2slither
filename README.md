@@ -103,6 +103,12 @@ Le dossier `models/` contient les modèles entraînés livrés avec le projet :
 - `models/100sess.txt` — entraîné sur 100 sessions
 - `models/1000sess.txt` — entraîné sur 1000 sessions
 
+Seuls ces quatre fichiers sont versionnés. Les snapshots du dashboard
+(`models/model_gen*.txt`) sont ignorés par Git, et les résultats
+d'expérimentation ne vont pas dans `models/` : la recherche par grille
+(`PYTHONPATH=src python -m snakeai.training.tune`) écrit par défaut dans
+`data/tuning_results.csv`, dossier lui aussi ignoré par Git.
+
 ## Contrainte respectée
 
 L'agent ne perçoit que la vision du serpent depuis sa tête, sous forme de

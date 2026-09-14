@@ -10,7 +10,7 @@ fait qu'orchestrer des entrainements repetes et en comparer les resultats.
 Usage :
     PYTHONPATH=src python -m snakeai.training.tune
     PYTHONPATH=src python -m snakeai.training.tune --sessions 200 \
-        --output models/tuning_results.csv
+        --output data/tuning_results.csv
 """
 
 import argparse
@@ -31,7 +31,7 @@ ALPHAS = (0.05, 0.1, 0.2)
 GAMMAS = (0.8, 0.9, 0.95)
 EPSILON_DECAYS = (0.98, 0.995)
 SESSIONS_PER_COMBO = 200
-DEFAULT_OUTPUT = "models/tuning_results.csv"
+DEFAULT_OUTPUT = "data/tuning_results.csv"
 
 _FIELDNAMES = ["alpha", "gamma", "epsilon_decay", "sessions",
                "best_length", "best_duration", "mean_length",
