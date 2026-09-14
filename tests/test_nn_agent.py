@@ -57,6 +57,21 @@ def test_save_load_roundtrip_preserves_behavior(tmp_path):
     assert action_after == action_before
 
 
+def test_seed_makes_initial_weights_reproducible():
+    """Regression : `-seed` ne grainait que `random`, pas numpy.
+
+    Les poids initiaux venaient de `np.random.default_rng()` sans graine :
+    deux runs `-model nn -seed 42` partaient de reseaux differents.
+    """
+    first = NNAgent(seed=42)
+    second = NNAgent(seed=42)
+    other = NNAgent(seed=7)
+
+    assert (first.w1 == second.w1).all()
+    assert (first.w2 == second.w2).all()
+    assert not (first.w1 == other.w1).all()
+
+
 def test_load_missing_file_returns_false():
     agent = NNAgent()
     assert agent.load("/chemin/inexistant/modele.json") is False

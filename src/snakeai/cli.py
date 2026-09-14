@@ -105,8 +105,9 @@ def main():
     args = parse_args()
     if args.seed is not None:
         # Graine le module `random` global : utilise a la fois par
-        # Environment (placement serpent/pommes) et Agent (epsilon-greedy),
-        # donc suffisant pour rendre un run reproductible.
+        # Environment (placement serpent/pommes) et les agents
+        # (epsilon-greedy). Ne couvre pas numpy : l'initialisation des poids
+        # de NNAgent recoit la graine separement dans `_build_agent()`.
         random.seed(args.seed)
 
     if args.replay:
@@ -160,7 +161,10 @@ def _build_agent(args):
     if args.model == "nn":
         # Import paresseux : numpy n'est requis que pour le reseau de neurones.
         from snakeai.learning import NNAgent
-        agent = NNAgent()
+        # La graine doit etre propagee explicitement : les poids initiaux
+        # viennent d'un generateur numpy local, que `random.seed()` n'atteint
+        # pas (cf. main()).
+        agent = NNAgent(seed=args.seed)
     else:
         agent = Agent()
     if args.load:
