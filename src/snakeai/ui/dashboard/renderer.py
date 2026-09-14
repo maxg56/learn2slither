@@ -137,9 +137,15 @@ class Renderer:
         self.screen.blit(overlay, (0, 0))
 
         env = sim.envs[index]
-        big_px = min(32, max(14, self.cell_px * 4))
-        side = self.board_size * big_px
         pad = 14
+        # La cellule agrandie est bornee par la place disponible : sur un
+        # grand board (`-board-size`), le panneau doit rester dans la
+        # fenetre plutot que deborder de part et d'autre.
+        fit = max(2, (min(self.screen.get_width(),
+                          self.screen.get_height()) - 2 * pad - 26)
+                  // self.board_size)
+        big_px = min(32, max(14, self.cell_px * 4), fit)
+        side = self.board_size * big_px
         panel_w = side + 2 * pad
         panel_h = side + 2 * pad + 26
         px = (self.screen.get_width() - panel_w) // 2

@@ -16,6 +16,15 @@ from snakeai import constants
 # de garder une empreinte memoire raisonnable meme sur de longues parties.
 GIF_MAX_FRAMES = 600
 
+# Cote maximal de la fenetre, en pixels. La taille des cellules est deduite
+# de la taille du board pour ne pas deborder de l'ecran sur un grand board
+# (`-board-size 40` tiendrait sinon dans une fenetre de 1600 px).
+WINDOW_MAX_PX = 800
+
+# Bornes de la taille d'une cellule, en pixels.
+CELL_PX_MIN = 4
+CELL_PX_MAX = 40
+
 # Couleurs (R, V, B).
 COLOR_BG = (18, 18, 24)
 COLOR_GRID = (34, 34, 44)
@@ -25,13 +34,21 @@ COLOR_GREEN_APPLE = (60, 200, 60)
 COLOR_RED_APPLE = (210, 60, 60)
 
 
+def _auto_cell_pixels(size):
+    """Taille de cellule tenant dans `WINDOW_MAX_PX` pour un board `size`."""
+    if size <= 0:
+        return CELL_PX_MAX
+    return max(CELL_PX_MIN, min(CELL_PX_MAX, WINDOW_MAX_PX // size))
+
+
 class Display:
     """Rendu pygame du jeu."""
 
-    def __init__(self, size=constants.BOARD_SIZE, cell_pixels=40, fps=10,
+    def __init__(self, size=constants.BOARD_SIZE, cell_pixels=None, fps=10,
                  export_path=None):
         self.size = size
-        self.cell_pixels = cell_pixels
+        self.cell_pixels = (cell_pixels if cell_pixels is not None
+                            else _auto_cell_pixels(size))
         self.fps = fps
         self.quit = False
         # Export GIF (optionnel) : accumule les frames dessinees par
@@ -40,11 +57,26 @@ class Display:
         self._frames = []
         self._frame_stride = 1
         self._frame_tick = 0
+        self._auto_cell_pixels = cell_pixels is None
         pygame.init()
-        side = size * cell_pixels
+        side = self.size * self.cell_pixels
         self.screen = pygame.display.set_mode((side, side))
         pygame.display.set_caption("Learn2Slither")
         self.clock = pygame.time.Clock()
+
+    def resize(self, size):
+        """Reconfigure la fenetre pour un board de cote `size`.
+
+        Utilise par le replay, qui cree l'affichage avant de connaitre la
+        taille enregistree. Sans effet si la taille est deja la bonne.
+        """
+        if size == self.size or size <= 0:
+            return
+        self.size = size
+        if self._auto_cell_pixels:
+            self.cell_pixels = _auto_cell_pixels(size)
+        side = self.size * self.cell_pixels
+        self.screen = pygame.display.set_mode((side, side))
 
     def _pump(self):
         """Traite les evenements ; memorise une demande de fermeture."""
