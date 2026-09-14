@@ -83,12 +83,25 @@ class Agent:
         except OSError:
             return False
 
+    @staticmethod
+    def _valid_state(state):
+        """Vrai si `state` a la forme produite par Interpreter.get_state.
+
+        Tuple de STATE_SIZE bits (int 0/1) : toute autre forme signale un
+        modele produit avec un encodage d'etat incompatible.
+        """
+        if not isinstance(state, tuple) or len(state) != constants.STATE_SIZE:
+            return False
+        return all(type(v) is int and v in (0, 1) for v in state)
+
     def load(self, path):
         """Recharge un etat d'apprentissage depuis un fichier JSON.
 
         Tolerant aux fichiers absents ou corrompus (jamais de crash), y
         compris un JSON syntaxiquement valide mais de forme incorrecte
-        (q_table de mauvaise taille/type, hyperparametres non numeriques).
+        (q_table de mauvaise taille/type, hyperparametres non numeriques,
+        etats d'une autre longueur ou non binaires : un modele produit avec
+        un autre encodage d'etat est refuse plutot que joue au hasard).
         La validation se fait sur des variables locales : en cas d'echec,
         l'etat actuel de l'agent n'est jamais modifie.
         Retourne True si le chargement a reussi, False sinon.
@@ -109,7 +122,7 @@ class Agent:
             q_table = {}
             for state, values in raw_q_table.items():
                 parsed_state = ast.literal_eval(state)
-                if not isinstance(parsed_state, tuple):
+                if not self._valid_state(parsed_state):
                     return False
                 values = list(values)
                 if len(values) != len(constants.ACTIONS) or not all(

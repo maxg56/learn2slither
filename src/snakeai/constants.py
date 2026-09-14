@@ -28,6 +28,13 @@ MOVES = {
     RIGHT: (0, 1),
 }
 
+# --- Etat (vision reduite) -------------------------------------------------
+# Par direction, l'interpreteur produit 3 bits : danger adjacent, pomme verte
+# visible, pomme rouge visible. La taille de l'etat sert a valider qu'un
+# modele charge a bien ete produit avec cet encodage.
+FEATURES_PER_RAY = 3
+STATE_SIZE = FEATURES_PER_RAY * len(ACTIONS)
+
 # --- Caracteres d'affichage (terminal) -------------------------------------
 CELL_EMPTY = "0"
 CELL_WALL = "W"

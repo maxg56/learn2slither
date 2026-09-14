@@ -116,6 +116,47 @@ def test_load_q_table_key_not_tuple_returns_false_and_keeps_state():
         os.remove(path)
 
 
+def test_load_q_table_key_wrong_length_returns_false_and_keeps_state():
+    """Etat d'une autre longueur = modele produit avec un autre encodage."""
+    agent = _agent_with_state()
+    before = dict(agent.q_table)
+    path = _tmp_path()
+    try:
+        with open(path, "w") as handle:
+            handle.write(
+                '{"alpha": 0.1, "gamma": 0.9, "epsilon": 1.0, '
+                '"q_table": {"(1, 2)": [0, 0, 0, 0]}}'
+            )
+
+        ok = agent.load(path)
+
+        assert ok is False
+        assert agent.q_table == before
+    finally:
+        os.remove(path)
+
+
+def test_load_q_table_key_non_binary_returns_false_and_keeps_state():
+    """Bonne longueur mais composantes hors {0, 1} (distance encodee)."""
+    agent = _agent_with_state()
+    before = dict(agent.q_table)
+    path = _tmp_path()
+    try:
+        with open(path, "w") as handle:
+            handle.write(
+                '{"alpha": 0.1, "gamma": 0.9, "epsilon": 1.0, '
+                '"q_table": {"(0, 3, 0, 0, 0.5, 0, 0, 0, 0, 0, 0, 0)": '
+                '[1.0, 2.0, 3.0, 4.0]}}'
+            )
+
+        ok = agent.load(path)
+
+        assert ok is False
+        assert agent.q_table == before
+    finally:
+        os.remove(path)
+
+
 def test_load_non_numeric_hyperparameter_returns_false_and_keeps_state():
     agent = _agent_with_state()
     before = dict(agent.q_table)
@@ -161,6 +202,8 @@ if __name__ == "__main__":
     test_load_q_table_value_wrong_type_returns_false_and_keeps_state()
     test_load_q_table_value_wrong_length_returns_false_and_keeps_state()
     test_load_q_table_key_not_tuple_returns_false_and_keeps_state()
+    test_load_q_table_key_wrong_length_returns_false_and_keeps_state()
+    test_load_q_table_key_non_binary_returns_false_and_keeps_state()
     test_load_non_numeric_hyperparameter_returns_false_and_keeps_state()
     test_save_then_load_round_trip()
     print("OK - tous les tests de chargement d'agent passent")
