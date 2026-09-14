@@ -1,4 +1,37 @@
 #!/bin/sh
 # Point d'entree executable du projet Learn2Slither.
-# Delegue au paquet snakeai via uv en passant tous les arguments.
-exec uv run --quiet python -m snakeai "$@"
+# Delegue au paquet snakeai en passant tous les arguments.
+#
+# Ordre de resolution de l'interpreteur (issue #55 : uv ne doit pas etre
+# obligatoire, le sujet ne fait taper que `./snake`) :
+#   1. uv, s'il est installe (chemin nominal : venv et dependances geres) ;
+#   2. un venv local au depot (.venv/ ou venv/) ;
+#   3. python3 du systeme.
+# Les chemins sont relatifs au repertoire du script, pas au repertoire courant.
+
+case "$0" in
+    */*) root=$(cd "${0%/*}" && pwd) ;;
+    *) root=$(pwd) ;;
+esac
+
+if command -v uv >/dev/null 2>&1; then
+    exec uv run --quiet --project "$root" python -m snakeai "$@"
+fi
+
+# Sans uv, le layout src/ impose d'exposer le paquet explicitement
+# (inoffensif s'il a deja ete installe via `pip install -e .`).
+PYTHONPATH="$root/src${PYTHONPATH:+:$PYTHONPATH}"
+export PYTHONPATH
+
+for venv in "$root/.venv" "$root/venv"; do
+    if [ -x "$venv/bin/python" ]; then
+        exec "$venv/bin/python" -m snakeai "$@"
+    fi
+done
+
+if command -v python3 >/dev/null 2>&1; then
+    exec python3 -m snakeai "$@"
+fi
+
+echo "snake: aucun interpreteur Python trouve (uv, .venv/, venv/ ou python3)" >&2
+exit 127
