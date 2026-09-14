@@ -17,6 +17,7 @@ from snakeai.learning import Agent, NNAgent
 from snakeai.perception import Interpreter
 from snakeai.training import MetricsRecorder, plot as plot_metrics
 from snakeai.training import run_session, train
+from snakeai.training.replay import RecordingError
 from snakeai.training.replay import replay as replay_recording
 from snakeai.training.replay import save_recording
 
@@ -229,9 +230,12 @@ def _run_recorded_session(env, interp, agent, learn, args, display):
         agent.decay_epsilon()
     print("Game over, max length = {}, max duration = {}"
           .format(length, duration))
-    save_recording(args.record, frames, env.size)
-    print("Partie enregistree dans {} ({} frames)"
-          .format(args.record, len(frames)))
+    if save_recording(args.record, frames, env.size):
+        print("Partie enregistree dans {} ({} frames)"
+              .format(args.record, len(frames)))
+    else:
+        print("Avertissement : echec de l'enregistrement dans {}"
+              .format(args.record), file=sys.stderr)
     _save_model(agent, args.save)
 
 
@@ -241,6 +245,10 @@ def _run_replay(args):
     try:
         played = replay_recording(args.replay, display=display,
                                   step_by_step=args.step_by_step)
+    except RecordingError as error:
+        print("Avertissement : replay impossible depuis {} ({})"
+              .format(args.replay, error), file=sys.stderr)
+        return
     finally:
         if display is not None:
             display.close()
