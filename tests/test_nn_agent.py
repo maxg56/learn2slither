@@ -6,8 +6,12 @@ modifies), et un cycle save/load restitue le meme comportement en
 exploitation pure (epsilon=0).
 """
 
+import json
+
 from snakeai import constants
-from snakeai.learning.nn_agent import NNAgent
+from snakeai.learning.nn_agent import (
+    HIDDEN_UNITS, INPUT_SIZE, OUTPUT_SIZE, NNAgent,
+)
 
 STATE = (0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 0, 0)
 NEXT_STATE = (0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0)
@@ -56,6 +60,83 @@ def test_save_load_roundtrip_preserves_behavior(tmp_path):
 def test_load_missing_file_returns_false():
     agent = NNAgent()
     assert agent.load("/chemin/inexistant/modele.json") is False
+
+
+def _valid_payload():
+    """Modele JSON bien forme, base pour les variantes corrompues."""
+    return {
+        "alpha": 0.1, "gamma": 0.9, "epsilon": 0.0,
+        "w1": [[0.0] * HIDDEN_UNITS for _ in range(INPUT_SIZE)],
+        "b1": [0.0] * HIDDEN_UNITS,
+        "w2": [[0.0] * OUTPUT_SIZE for _ in range(HIDDEN_UNITS)],
+        "b2": [0.0] * OUTPUT_SIZE,
+    }
+
+
+def _write(path, payload):
+    with open(path, "w") as handle:
+        json.dump(payload, handle)
+    return path
+
+
+def test_load_rejects_corrupted_payloads(tmp_path):
+    """Regression : un JSON bien forme mais incoherent etait accepte.
+
+    `load()` ecrivait directement dans `self` sans verifier les dimensions
+    des poids : le modele passait, puis le premier forward levait une
+    ValueError (`matmul: ... size 8 is different from 12`).
+    """
+    bad_w1 = _valid_payload()
+    bad_w1["w1"] = [[0.0] * HIDDEN_UNITS for _ in range(INPUT_SIZE - 4)]
+
+    bad_b1 = _valid_payload()
+    bad_b1["b1"] = [0.0] * (HIDDEN_UNITS + 1)
+
+    bad_w2 = _valid_payload()
+    bad_w2["w2"] = [[0.0] * (OUTPUT_SIZE + 1) for _ in range(HIDDEN_UNITS)]
+
+    bad_b2 = _valid_payload()
+    bad_b2["b2"] = 0.0
+
+    bad_alpha = _valid_payload()
+    bad_alpha["alpha"] = "vite"
+
+    missing_key = _valid_payload()
+    del missing_key["w2"]
+
+    payloads = {
+        "bad_w1": bad_w1, "bad_b1": bad_b1, "bad_w2": bad_w2,
+        "bad_b2": bad_b2, "bad_alpha": bad_alpha,
+        "missing_key": missing_key,
+    }
+    for name, payload in payloads.items():
+        agent = NNAgent()
+        path = _write(str(tmp_path / (name + ".json")), payload)
+        assert agent.load(path) is False, name
+        # L'agent reste utilisable : aucun forward ne doit crasher.
+        assert agent.choose_action(STATE) in constants.ACTIONS
+
+
+def test_failed_load_leaves_state_untouched(tmp_path):
+    agent = NNAgent()
+    agent.alpha = 0.42
+    w1_before = agent.w1.copy()
+
+    bad = _valid_payload()
+    bad["alpha"] = 0.01
+    bad["w1"] = [[0.0] * HIDDEN_UNITS for _ in range(INPUT_SIZE - 4)]
+    assert agent.load(_write(str(tmp_path / "bad.json"), bad)) is False
+
+    assert agent.alpha == 0.42
+    assert (agent.w1 == w1_before).all()
+
+
+def test_load_accepts_valid_payload(tmp_path):
+    agent = NNAgent()
+    path = _write(str(tmp_path / "ok.json"), _valid_payload())
+    assert agent.load(path) is True
+    assert agent.w1.shape == (INPUT_SIZE, HIDDEN_UNITS)
+    assert agent.choose_action(STATE) in constants.ACTIONS
 
 
 if __name__ == "__main__":
