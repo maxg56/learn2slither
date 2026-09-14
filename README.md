@@ -19,12 +19,23 @@ si besoin :
 uv sync
 ```
 
-Le wrapper `./snake` invoque directement `uv run python -m snakeai`, donc
-aucune activation manuelle de venv n'est nécessaire : une fois `uv sync`
-exécuté, `./snake ...` fonctionne tel quel.
+Le wrapper `./snake` invoque `uv run python -m snakeai` quand `uv` est
+installé, donc aucune activation manuelle de venv n'est nécessaire : une fois
+`uv sync` exécuté, `./snake ...` fonctionne tel quel.
 
-Une installation classique reste possible sur tout Python >= 3.10
-(`pip install -e .`, ou `pip install -r requirements.txt`).
+`uv` n'est toutefois pas obligatoire. Une installation classique reste
+possible sur tout Python >= 3.10, et `./snake` s'y adapte en cherchant, dans
+l'ordre : `uv`, puis un venv local au dépôt (`.venv/` ou `venv/`), puis le
+`python3` du système avec `src/` ajouté au `PYTHONPATH` :
+
+```bash
+python3 -m venv .venv && . .venv/bin/activate
+pip install -r requirements.txt   # ou : pip install -e .
+./snake -sessions 1 -visual off
+```
+
+Les chemins sont résolus par rapport au répertoire du script, donc
+`./snake` fonctionne aussi appelé depuis un autre répertoire.
 
 Deux dépendances sont facultatives et seulement utiles à des options bonus :
 `matplotlib` pour `-plot` et `Pillow` pour `-export-gif`. En leur absence, le
