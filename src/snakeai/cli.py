@@ -132,20 +132,36 @@ def main():
     recorder = MetricsRecorder() if (args.metrics or args.plot) else None
 
     if args.record:
-        _run_recorded_session(env, interp, agent, learn, args, display)
+        best_length, best_duration, lengths, durations = \
+            _run_recorded_session(env, interp, agent, learn, args, display,
+                                  recorder)
     else:
         best_length, best_duration, lengths, durations = train(
             env, interp, agent, args, display, recorder)
-        print("Game over, max length = {}, max duration = {}"
-              .format(best_length, best_duration))
-        _print_records(best_length)
-        if args.benchmark:
-            _print_benchmark(lengths, durations)
-        _save_model(agent, args.save)
-        _export_metrics(recorder, args.metrics, args.plot)
+    _report_run(agent, args, recorder,
+                best_length, best_duration, lengths, durations)
 
     if display is not None:
         display.close()
+
+
+def _report_run(agent, args, recorder,
+                best_length, best_duration, lengths, durations):
+    """Bilan commun aux deux branches (train / -record).
+
+    Centralise ici tout ce qui suit la ou les parties jouees : ligne de
+    game over, paliers, benchmark, sauvegarde du modele et export des
+    metriques. Avant, la branche `-record` n'appelait ni `_print_benchmark`
+    ni `_export_metrics`, si bien que `-metrics`, `-plot` et `-benchmark`
+    etaient avales en silence (issue #27).
+    """
+    print("Game over, max length = {}, max duration = {}"
+          .format(best_length, best_duration))
+    _print_records(best_length)
+    if args.benchmark:
+        _print_benchmark(lengths, durations)
+    _save_model(agent, args.save)
+    _export_metrics(recorder, args.metrics, args.plot)
 
 
 def _build_agent(args):
@@ -213,30 +229,37 @@ def _export_metrics(recorder, metrics_path, plot_path):
         os.unlink(tmp_csv)
 
 
-def _run_recorded_session(env, interp, agent, learn, args, display):
+def _run_recorded_session(env, interp, agent, learn, args, display,
+                          recorder=None):
     """Joue une session unique en enregistrant chaque frame vers -record.
 
     L'agent joue normalement (honore -dontlearn/-load) ; seule la boucle
     multi-sessions de `train()` est court-circuitee, puisqu'un
-    enregistrement ne porte que sur une seule partie.
+    enregistrement ne porte que sur une seule partie. Retourne le meme
+    quadruplet que `train()` (best_length, best_duration, lengths,
+    durations) pour que `main()` traite les deux branches a l'identique ;
+    `recorder` recoit le bilan de la partie comme dans `train()`, afin que
+    `-metrics` / `-plot` restent honores avec `-record`.
     """
     verbose = args.visual == "on" or args.step_by_step
     frames = []
-    length, duration, _total_reward = run_session(
+    length, duration, total_reward = run_session(
         env, interp, agent, learn, verbose, args.step_by_step, display,
         record=frames,
     )
     if learn:
         agent.decay_epsilon()
-    print("Game over, max length = {}, max duration = {}"
-          .format(length, duration))
+    if recorder is not None:
+        recorder.record(1, length, duration, agent.epsilon, total_reward)
     if save_recording(args.record, frames, env.size):
         print("Partie enregistree dans {} ({} frames)"
               .format(args.record, len(frames)))
     else:
         print("Avertissement : echec de l'enregistrement dans {}"
               .format(args.record), file=sys.stderr)
-    _save_model(agent, args.save)
+    lengths, durations = ([length], [duration]) if args.benchmark \
+        else ([], [])
+    return length, duration, lengths, durations
 
 
 def _run_replay(args):
