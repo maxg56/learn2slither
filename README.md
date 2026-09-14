@@ -8,9 +8,11 @@ longueur d'au moins 10 et la durée de vie la plus longue possible.
 
 ## Installation
 
-Le projet est packagé avec [uv](https://docs.astral.sh/uv/) et cible Python
-3.14 (voir `pyproject.toml`). L'installation la plus fiable est donc via `uv`,
-qui télécharge lui-même l'interpréteur Python requis si besoin :
+Le projet est packagé avec [uv](https://docs.astral.sh/uv/). Il demande
+Python >= 3.10 (`requires-python` dans `pyproject.toml`) ; la version épinglée
+pour le développement est celle de `.python-version` (3.11). L'installation la
+plus fiable passe donc par `uv`, qui télécharge lui-même l'interpréteur voulu
+si besoin :
 
 ```bash
 # Installer les dépendances (numpy, pygame-ce, flake8) dans .venv
@@ -21,9 +23,12 @@ Le wrapper `./snake` invoque directement `uv run python -m snakeai`, donc
 aucune activation manuelle de venv n'est nécessaire : une fois `uv sync`
 exécuté, `./snake ...` fonctionne tel quel.
 
-> Remarque : `pip install -e .` échoue sur un Python < 3.12 (numpy>=2.5.0 et
-> le `requires-python` du projet imposent une version récente) ; utiliser
-> `uv sync` évite ce problème.
+Une installation classique reste possible sur tout Python >= 3.10
+(`pip install -e .`, ou `pip install -r requirements.txt`).
+
+Deux dépendances sont facultatives et seulement utiles à des options bonus :
+`matplotlib` pour `-plot` et `Pillow` pour `-export-gif`. En leur absence, le
+programme affiche un avertissement et continue sans crasher.
 
 ## Utilisation
 
@@ -36,18 +41,34 @@ exécuté, `./snake ...` fonctionne tel quel.
 ./snake -visual on -load models/100sess.txt -sessions 10 -dontlearn -step-by-step
 ```
 
-Flags disponibles :
+Flags du sujet :
 
 | Flag | Rôle |
 | --- | --- |
 | `-sessions N` | nombre de sessions d'entraînement (défaut : 1) |
 | `-save PATH` | sauvegarde le modèle (Q-table) à la fin |
 | `-load PATH` | charge un modèle existant avant de démarrer |
-| `-visual on\|off` | affichage graphique pygame (défaut : `on`) |
+| `-visual on\|off` | affichage graphique pygame (défaut : `on`) ; `off` coupe aussi l'affichage terminal de la vision |
 | `-dontlearn` | exploitation pure : epsilon=0, aucune mise à jour |
 | `-step-by-step` | avance action par action |
+
+Options supplémentaires (bonus et outillage) :
+
+| Flag | Rôle |
+| --- | --- |
+| `-model qtable\|nn` | fonction Q utilisée : Q-table ou réseau de neurones (défaut : `qtable`) |
+| `-board-size N` | côté du board (défaut : 10) ; N >= 3 |
+| `-seed N` | graine aléatoire pour des runs reproductibles |
+| `-reward-shaping default\|alt` | schéma de reward : historique ou alternatif (anti demi-tour + bonus de survie) |
+| `-benchmark` | agrège longueur/durée (mean/min/max) sur toutes les sessions |
+| `-metrics PATH` | export CSV des courbes d'entraînement |
+| `-plot PATH` | export PNG des courbes (nécessite `matplotlib`) |
+| `-record PATH` | enregistre une partie (frames) vers PATH |
+| `-replay PATH` | rejoue un enregistrement `-record`, sans agent |
+| `-export-gif PATH` | exporte la partie jouée en GIF animé (nécessite `-visual on` et `Pillow`) |
 | `-dashboard` | vue parallèle (bonus) : plusieurs parties simultanées |
-| `-grid N` | taille de la grille du dashboard (`-dashboard`) |
+| `-grid N` | côté de la grille du dashboard (`-dashboard`), défaut : 6 |
+| `-dashboard-lobby` | lobby de choix de modèle avant le dashboard (`-dashboard` requis) |
 
 À la fin de chaque exécution, le programme affiche
 `Game over, max length = X, max duration = Y`.
