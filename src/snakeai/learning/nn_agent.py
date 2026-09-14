@@ -1,10 +1,10 @@
 """nn_agent.py - Q-learning : reseau de neurones, epsilon-greedy, update.
 
 Alternative a la Q-table de agent.py : la fonction Q est ici approximee par
-un petit reseau feed-forward (12 entrees -> couche cachee -> 4 sorties),
-implemente a la main avec numpy (forward/backward manuels, sans framework
-de deep learning). Meme interface publique que Agent pour rester
-interchangeable depuis cli.py/trainer.py.
+un petit reseau feed-forward (constants.STATE_SIZE entrees -> couche
+cachee -> 4 sorties), implemente a la main avec numpy (forward/backward
+manuels, sans framework de deep learning). Meme interface publique que
+Agent pour rester interchangeable depuis cli.py/trainer.py.
 """
 
 import json
@@ -15,7 +15,7 @@ import numpy as np
 from snakeai import constants
 
 HIDDEN_UNITS = 12
-INPUT_SIZE = 12
+INPUT_SIZE = constants.STATE_SIZE
 OUTPUT_SIZE = len(constants.ACTIONS)
 
 

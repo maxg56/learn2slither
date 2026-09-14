@@ -29,10 +29,12 @@ MOVES = {
 }
 
 # --- Etat (vision reduite) -------------------------------------------------
-# Par direction, l'interpreteur produit 3 bits : danger adjacent, pomme verte
-# visible, pomme rouge visible. La taille de l'etat sert a valider qu'un
-# modele charge a bien ete produit avec cet encodage.
-FEATURES_PER_RAY = 3
+# Par direction, l'interpreteur produit 4 bits : danger adjacent, pomme verte
+# visible, pomme rouge visible, pomme rouge adjacente. Le dernier bit permet
+# de distinguer une rouge collee a la tete (mortelle a longueur 1) d'une rouge
+# lointaine sur le meme rayon, sans encoder de distance. La taille de l'etat
+# sert a valider qu'un modele charge a bien ete produit avec cet encodage.
+FEATURES_PER_RAY = 4
 STATE_SIZE = FEATURES_PER_RAY * len(ACTIONS)
 
 # --- Caracteres d'affichage (terminal) -------------------------------------

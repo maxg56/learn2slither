@@ -13,8 +13,8 @@ from snakeai.learning.nn_agent import (
     HIDDEN_UNITS, INPUT_SIZE, OUTPUT_SIZE, NNAgent,
 )
 
-STATE = (0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 0, 0)
-NEXT_STATE = (0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0)
+STATE = (0, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0)
+NEXT_STATE = (0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0)
 
 
 def test_choose_action_returns_valid_action():
@@ -99,7 +99,7 @@ def test_load_rejects_corrupted_payloads(tmp_path):
 
     `load()` ecrivait directement dans `self` sans verifier les dimensions
     des poids : le modele passait, puis le premier forward levait une
-    ValueError (`matmul: ... size 8 is different from 12`).
+    ValueError (`matmul: ... size 12 is different from 16`).
     """
     bad_w1 = _valid_payload()
     bad_w1["w1"] = [[0.0] * HIDDEN_UNITS for _ in range(INPUT_SIZE - 4)]
