@@ -57,8 +57,9 @@ class Simulation:
         state = self.states[i]
         action = self.agent.choose_action(state)
         dist_before = self.interp.green_distance(env)
+        prev_direction = env.direction
         event = env.step(action)
-        reward = self.interp.get_reward(event)
+        reward = self.interp.get_reward(event, prev_direction, action)
         dist_after = (self.interp.green_distance(env)
                       if event["type"] == "nothing" else None)
         reward += self.interp.approach_bonus(
