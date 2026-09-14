@@ -6,12 +6,21 @@ modifies), et un cycle save/load restitue le meme comportement en
 exploitation pure (epsilon=0).
 """
 
+import argparse
+import io
 import json
+import random
+from contextlib import redirect_stdout
+
+import numpy as np
 
 from snakeai import constants
+from snakeai.core import Environment
 from snakeai.learning.nn_agent import (
-    HIDDEN_UNITS, INPUT_SIZE, OUTPUT_SIZE, NNAgent,
+    HIDDEN_UNITS, INPUT_SIZE, OUTPUT_SIZE, TARGET_SYNC_STEPS, NNAgent,
 )
+from snakeai.perception import Interpreter
+from snakeai.training.trainer import train
 
 STATE = (0, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0)
 NEXT_STATE = (0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0)
@@ -80,7 +89,7 @@ def test_load_missing_file_returns_false():
 def _valid_payload():
     """Modele JSON bien forme, base pour les variantes corrompues."""
     return {
-        "alpha": 0.1, "gamma": 0.9, "epsilon": 0.0,
+        "learning_rate": 0.05, "gamma": 0.9, "epsilon": 0.0,
         "w1": [[0.0] * HIDDEN_UNITS for _ in range(INPUT_SIZE)],
         "b1": [0.0] * HIDDEN_UNITS,
         "w2": [[0.0] * OUTPUT_SIZE for _ in range(HIDDEN_UNITS)],
@@ -113,15 +122,15 @@ def test_load_rejects_corrupted_payloads(tmp_path):
     bad_b2 = _valid_payload()
     bad_b2["b2"] = 0.0
 
-    bad_alpha = _valid_payload()
-    bad_alpha["alpha"] = "vite"
+    bad_lr = _valid_payload()
+    bad_lr["learning_rate"] = "vite"
 
     missing_key = _valid_payload()
     del missing_key["w2"]
 
     payloads = {
         "bad_w1": bad_w1, "bad_b1": bad_b1, "bad_w2": bad_w2,
-        "bad_b2": bad_b2, "bad_alpha": bad_alpha,
+        "bad_b2": bad_b2, "bad_lr": bad_lr,
         "missing_key": missing_key,
     }
     for name, payload in payloads.items():
@@ -134,15 +143,15 @@ def test_load_rejects_corrupted_payloads(tmp_path):
 
 def test_failed_load_leaves_state_untouched(tmp_path):
     agent = NNAgent()
-    agent.alpha = 0.42
+    agent.learning_rate = 0.42
     w1_before = agent.w1.copy()
 
     bad = _valid_payload()
-    bad["alpha"] = 0.01
+    bad["learning_rate"] = 0.01
     bad["w1"] = [[0.0] * HIDDEN_UNITS for _ in range(INPUT_SIZE - 4)]
     assert agent.load(_write(str(tmp_path / "bad.json"), bad)) is False
 
-    assert agent.alpha == 0.42
+    assert agent.learning_rate == 0.42
     assert (agent.w1 == w1_before).all()
 
 
@@ -152,14 +161,6 @@ def test_load_accepts_valid_payload(tmp_path):
     assert agent.load(path) is True
     assert agent.w1.shape == (INPUT_SIZE, HIDDEN_UNITS)
     assert agent.choose_action(STATE) in constants.ACTIONS
-
-
-if __name__ == "__main__":
-    test_choose_action_returns_valid_action()
-    test_update_changes_weights_without_raising()
-    test_update_handles_terminal_transition()
-    test_load_missing_file_returns_false()
-    print("OK - tests NNAgent (hors roundtrip qui necessite tmp_path)")
 
 
 def test_epsilon_decay_is_configurable_and_persisted(tmp_path):
@@ -191,3 +192,68 @@ def test_load_rejects_non_numeric_epsilon_decay(tmp_path):
     agent = NNAgent()
     assert agent.load(str(path)) is False
     assert agent.epsilon_decay == constants.EPSILON_DECAY
+
+
+def test_target_network_is_synced_periodically():
+    """Le reseau cible reste fige entre deux synchronisations.
+
+    Sans cette stabilite, la cible `r + gamma * max Q(s')` derive a chaque
+    pas et l'apprentissage ne converge pas (issue #56).
+    """
+    agent = NNAgent(seed=0)
+    target_before = [w.copy() for w in agent._target]
+    for _ in range(TARGET_SYNC_STEPS - 1):
+        agent.update(STATE, constants.UP, constants.REWARD_NOTHING,
+                     NEXT_STATE)
+    assert all((a == b).all() for a, b in zip(agent._target, target_before))
+    assert not (agent.w1 == target_before[0]).all()
+
+    agent.update(STATE, constants.UP, constants.REWARD_NOTHING, NEXT_STATE)
+    assert (agent._target[0] == agent.w1).all()
+    assert (agent._target[2] == agent.w2).all()
+
+
+def test_load_syncs_target_with_loaded_weights(tmp_path):
+    trained = NNAgent(seed=0)
+    for _ in range(3):
+        trained.update(STATE, constants.RIGHT, constants.REWARD_GREEN,
+                       NEXT_STATE)
+    path = str(tmp_path / "nn_model.json")
+    assert trained.save(path) is True
+
+    reloaded = NNAgent(seed=1)
+    assert reloaded.load(path) is True
+    assert (reloaded._target[0] == reloaded.w1).all()
+    assert (reloaded._target[2] == reloaded.w2).all()
+
+
+def _mean_length(agent, sessions, learn):
+    args = argparse.Namespace(
+        sessions=sessions, visual="off", dontlearn=not learn,
+        step_by_step=False, benchmark=True,
+    )
+    with redirect_stdout(io.StringIO()):
+        _, _, lengths, _ = train(Environment(), Interpreter(), agent, args)
+    return float(np.mean(lengths))
+
+
+def test_nn_agent_learns_better_than_random():
+    """Non-regression (#56) : `-model nn` doit reellement apprendre.
+
+    Avant la correction, le reseau restait au niveau d'un agent aleatoire
+    (longueur moyenne ~3) meme apres 500 sessions : learning rate confondu
+    avec l'alpha de la Q-table, rewards bruts non normalises et SGD en
+    ligne sans replay buffer ni reseau cible. On entraine quelques
+    centaines de sessions avec une graine fixe, puis on compare en
+    exploitation pure (epsilon=0) a une politique uniforme (epsilon=1).
+    """
+    random.seed(1)
+    agent = NNAgent(seed=1)
+    _mean_length(agent, sessions=400, learn=True)
+    agent.epsilon = 0.0
+    trained_mean = _mean_length(agent, sessions=30, learn=False)
+
+    uniform = NNAgent(seed=1, epsilon=1.0)
+    random_mean = _mean_length(uniform, sessions=30, learn=False)
+
+    assert trained_mean > random_mean + 3, (trained_mean, random_mean)

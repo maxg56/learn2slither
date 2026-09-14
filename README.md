@@ -67,7 +67,7 @@ Options supplémentaires (bonus et outillage) :
 
 | Flag | Rôle |
 | --- | --- |
-| `-model qtable\|nn` | fonction Q utilisée : Q-table ou réseau de neurones (défaut : `qtable`) |
+| `-model qtable\|nn` | fonction Q utilisée : Q-table ou réseau de neurones (défaut : `qtable`), voir [Réseau de neurones](#réseau-de-neurones--model-nn) |
 | `-board-size N` | côté du board (défaut : 10) ; N >= 3 |
 | `-seed N` | graine aléatoire pour des runs reproductibles |
 | `-reward-shaping default\|alt` | schéma de reward : historique ou alternatif (anti demi-tour + bonus de survie) |
@@ -108,6 +108,22 @@ Seuls ces quatre fichiers sont versionnés. Les snapshots du dashboard
 d'expérimentation ne vont pas dans `models/` : la recherche par grille
 (`PYTHONPATH=src python -m snakeai.training.tune`) écrit par défaut dans
 `data/tuning_results.csv`, dossier lui aussi ignoré par Git.
+
+## Réseau de neurones (`-model nn`)
+
+`-model nn` remplace la Q-table par un petit réseau feed-forward écrit en
+numpy (16 entrées → 32 neurones `tanh` → 4 Q-values), entraîné par
+descente de gradient. Pour converger là où la Q-table est exacte par
+construction, il embarque les stabilisateurs classiques du DQN : learning
+rate propre (distinct de l'alpha de la Q-table), rewards ramenés dans
+`[-1, 1]`, replay buffer échantillonné par mini-lots et réseau cible
+resynchronisé périodiquement. Ordre de grandeur (`-seed 1`, 30 parties en
+`-dontlearn`) : longueur moyenne ≈ 18 après 400 sessions, ≈ 20 après 1000
+(Q-table : ≈ 18 à 1000 sessions). Un test de non-régression vérifie que le
+réseau bat un agent aléatoire.
+
+Les fichiers `-save`/`-load` d'un modèle `nn` contiennent les poids du
+réseau ; ils ne sont pas interchangeables avec ceux d'une Q-table.
 
 ## Contrainte respectée
 
