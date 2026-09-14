@@ -9,5 +9,9 @@ __pycache__/
 # Snapshots auto-sauvegardes par le dashboard (artefacts d'entrainement)
 models/model_gen*.txt
 
+# Artefacts d'experimentation (ex. data/tuning_results.csv, sortie de
+# snakeai.training.tune) : jamais des modeles livres, donc hors de models/
+data/
+
 # Worktrees locaux crees par le harness Claude Code pour les sous-agents
 .claude/
