@@ -23,10 +23,12 @@ class NNAgent:
     """Agent Q-learning dont la fonction Q est un petit reseau de neurones."""
 
     def __init__(self, alpha=constants.ALPHA, gamma=constants.GAMMA,
-                 epsilon=constants.EPSILON_START, seed=None):
+                 epsilon=constants.EPSILON_START,
+                 epsilon_decay=constants.EPSILON_DECAY, seed=None):
         self.alpha = alpha
         self.gamma = gamma
         self.epsilon = epsilon
+        self.epsilon_decay = epsilon_decay
         # `seed` graine le generateur local plutot que l'etat global numpy :
         # sans lui, l'initialisation des poids reste aleatoire et `-seed`
         # ne suffit pas a rendre un run `-model nn` reproductible.
@@ -95,7 +97,7 @@ class NNAgent:
     def decay_epsilon(self):
         """Reduit epsilon vers sa valeur minimale."""
         self.epsilon = max(constants.EPSILON_MIN,
-                           self.epsilon * constants.EPSILON_DECAY)
+                           self.epsilon * self.epsilon_decay)
 
     def save(self, path):
         """Serialise tout l'etat d'apprentissage dans un fichier JSON.
@@ -107,6 +109,7 @@ class NNAgent:
             "alpha": self.alpha,
             "gamma": self.gamma,
             "epsilon": self.epsilon,
+            "epsilon_decay": self.epsilon_decay,
             "w1": self.w1.tolist(),
             "b1": self.b1.tolist(),
             "w2": self.w2.tolist(),
@@ -136,8 +139,9 @@ class NNAgent:
             alpha = data.get("alpha", self.alpha)
             gamma = data.get("gamma", self.gamma)
             epsilon = data.get("epsilon", self.epsilon)
+            epsilon_decay = data.get("epsilon_decay", self.epsilon_decay)
             if not all(isinstance(v, (int, float))
-                       for v in (alpha, gamma, epsilon)):
+                       for v in (alpha, gamma, epsilon, epsilon_decay)):
                 return False
             w1 = _as_array(data["w1"], (INPUT_SIZE, HIDDEN_UNITS))
             b1 = _as_array(data["b1"], (HIDDEN_UNITS,))
@@ -148,6 +152,7 @@ class NNAgent:
             self.alpha = alpha
             self.gamma = gamma
             self.epsilon = epsilon
+            self.epsilon_decay = epsilon_decay
             self.w1 = w1
             self.b1 = b1
             self.w2 = w2
