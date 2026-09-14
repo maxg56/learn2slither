@@ -13,7 +13,7 @@ import tempfile
 
 from snakeai import constants
 from snakeai.core import Environment
-from snakeai.learning import Agent, NNAgent
+from snakeai.learning import Agent
 from snakeai.perception import Interpreter
 from snakeai.training import MetricsRecorder, plot as plot_metrics
 from snakeai.training import run_session, train
@@ -117,17 +117,17 @@ def main():
     learn = not args.dontlearn
     interp = Interpreter(reward_mode=args.reward_shaping)
 
+    size = _board_size(args)
+
     if args.dashboard:
-        _run_dashboard(agent, interp, learn, args)
+        _run_dashboard(agent, interp, learn, args, size)
         return
 
     if args.export_gif and args.visual != "on":
         print("Avertissement : -export-gif necessite -visual on, "
               "export ignore ({})".format(args.export_gif), file=sys.stderr)
 
-    display = _make_display(args.visual == "on", args.export_gif)
-    size = args.board_size if args.board_size is not None \
-        else constants.BOARD_SIZE
+    display = _make_display(args.visual == "on", args.export_gif, size)
     env = Environment(size=size)
     recorder = MetricsRecorder() if (args.metrics or args.plot) else None
 
@@ -143,6 +143,7 @@ def main():
 
     if display is not None:
         display.close()
+
 
 
 def _report_run(agent, args, recorder,
@@ -162,11 +163,23 @@ def _report_run(agent, args, recorder,
         _print_benchmark(lengths, durations)
     _save_model(agent, args.save)
     _export_metrics(recorder, args.metrics, args.plot)
+    
+def _board_size(args):
+    """Cote du board demande, ou la valeur par defaut du projet."""
+    if args.board_size is not None:
+        return args.board_size
+    return constants.BOARD_SIZE
+  
 
 
 def _build_agent(args):
     """Cree l'agent, charge un modele et applique le mode -dontlearn."""
-    agent = NNAgent() if args.model == "nn" else Agent()
+    if args.model == "nn":
+        # Import paresseux : numpy n'est requis que pour le reseau de neurones.
+        from snakeai.learning import NNAgent
+        agent = NNAgent()
+    else:
+        agent = Agent()
     if args.load:
         if agent.load(args.load):
             print("Modele charge depuis {}".format(args.load))
@@ -300,11 +313,12 @@ def _print_benchmark(lengths, durations):
                   max(durations)))
 
 
-def _run_dashboard(agent, interp, learn, args):
+def _run_dashboard(agent, interp, learn, args, size):
     """Lance la vue parallele puis sauvegarde le modele si demande."""
     try:
         from snakeai.ui.dashboard import Dashboard
         board = Dashboard(agent, interp, cols=args.grid, rows=args.grid,
+                          board_size=size,
                           learn=learn, save_path=args.save,
                           start_lobby=args.dashboard_lobby)
         board.run()
@@ -317,13 +331,15 @@ def _run_dashboard(agent, interp, learn, args):
     _save_model(agent, args.save)
 
 
-def _make_display(enabled, export_gif=None):
+def _make_display(enabled, export_gif=None, size=None):
     """Cree l'affichage pygame si demande ; None sinon ou en cas d'echec."""
     if not enabled:
         return None
     try:
         from snakeai.ui.display import Display
-        return Display(export_path=export_gif)
+        if size is None:
+            size = constants.BOARD_SIZE
+        return Display(size=size, export_path=export_gif)
     except Exception as error:      # pragma: no cover - depend de l'env
         print("Avertissement : affichage graphique indisponible ({})"
               .format(error), file=sys.stderr)

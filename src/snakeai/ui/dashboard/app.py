@@ -19,16 +19,30 @@ FLASH_FRAMES = 120
 # Pas d'ajustement manuel de epsilon depuis le panneau de config.
 EPSILON_STEP = 0.01
 
+# Cote vise, en pixels, pour un board de la grille quand `cell_px` n'est pas
+# impose : la fenetre garde ainsi la meme taille quelle que soit la valeur
+# de `-board-size`.
+TARGET_BOARD_PX = 80
+
+
+def _auto_cell_px(board_size):
+    """Taille de cellule gardant un board a ~`TARGET_BOARD_PX` pixels."""
+    if board_size <= 0:
+        return 8
+    return max(2, TARGET_BOARD_PX // board_size)
+
 
 class Dashboard:
     """Coordonne simulation et rendu d'une grille de parties paralleles."""
 
     def __init__(self, agent, interp, cols=6, rows=5,
-                 board_size=None, cell_px=8, learn=True, save_path=None,
+                 board_size=None, cell_px=None, learn=True, save_path=None,
                  start_lobby=False):
         if board_size is None:
             from snakeai import constants
             board_size = constants.BOARD_SIZE
+        if cell_px is None:
+            cell_px = _auto_cell_px(board_size)
         self.sim = Simulation(agent, interp, cols, rows,
                               board_size=board_size, learn=learn,
                               save_path=save_path)
